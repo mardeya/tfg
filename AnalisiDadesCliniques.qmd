@@ -4,53 +4,125 @@ format: html
 editor: visual
 ---
 
-## Carregar la base de dades
+## Paquets necessaris
+
+En primer lloc, carregarem a continuació els paquets necessaris per dur a terme 
+els diferents models o les diverses funcions de R que necessitarem
 
 ```{r}
 library(dplyr)
-```
-
-
-Primer de tot carregam la base de dades
-```{r}
 library(readxl)
+```
+
+
+## Importar el dataset i processament
+
+Primer de tot importam el dataset de les dades clíniques
+
+```{r}
 clinical_data <- read_excel("clinical_data.xlsx")
-str(clinical_data)
-```
-
-Primer de tot, farem una selecció de les variables que ens interessen:
-
-```{r}
-clinical_data2 <- clinical_data %>% 
-  select(TCIA_ID, TTP, Death_1_StillAliveorLostToFU_0, Censored_0_progressed_1, OS, hepatitis, Sex, age, Smoking, Alcohol, fhx_can, fhx_livc, `Personal history of cancer`, Diabetes, Evidence_of_cirh, Lymphnodes, Metastasis, `Portal Vein Thrombosis`, Pathology, Tr_Size, tumor_nodul, T_involvment, AFP)
-```
-
-Convertim les variables qualitatives a factors:
-```{r}
-#attach(clinical_data2)
-var_fact = c("Death_1_StillAliveorLostToFU_0", "Censored_0_progressed_1", "hepatitis"
-             , "Sex", "Smoking", "Alcohol", "fhx_can", "fhx_livc", "Personal history of cancer",
-             "Diabetes", "Evidence_of_cirh", "Lymphnodes", "Metastasis", "Portal Vein Thrombosis",
-             "Pathology", "tumor_nodul", "T_involvment")
-
-var_quant = c("TTP", "Tr_Size", "AFP")
-clinical_data2[var_fact] <- lapply(clinical_data2[var_fact], as.integer)
-str(clinical_data2)
 ```
 
 
 
+Tenim un total de 105 observacions i 57 variables. D'aquestes variables ens
+interessen aquelles que descriuen l'estat clínic del pacient o aspectes biològics
+del malalt. Les seleccionam
+
 ```{r}
-cor(na.omit(clinical_data2[var_quant]))
+clinical_data_p <- clinical_data %>% 
+  select(TCIA_ID, Censored_0_progressed_1, OS, hepatitis, age, Sex, Smoking, Alcohol,
+         fhx_can, fhx_livc, Diabetes, `Personal history of cancer`, Evidence_of_cirh, 
+         Pathology, Tr_Size, tumor_nodul, `Vascular invasion`, Metastasis, Lymphnodes,
+         `Portal Vein Thrombosis`, T_involvment, AFP)
+```
+
+Hem eliminat principalment les variables que eren estratificacions i les 
+classificacions dels pacients segons diverses entitats. Ens hem quedat ara amb
+22 variables. D'aquestes eliminam $Tr_Size$ ja que presenta valors NA.
+
+```{r}
+clinical_data_p <- clinical_data_p %>% 
+  select(-Tr_Size)
 ```
 
 
-```{r}
-f <- lm(OS ~.-TCIA_ID, data= clinical_data2)
-summary(f)
-```
+Vegem quines són les variables numèriques i quines són les qualitatives. Tenim que 
+$TCIA_ID$ és la clau primària i la nostra variable resposta, Y, és $OS$
 
 ```{r}
-plot(f)
+#attach(clinical_data_p)
+
+clinical_data_p_numeriques <- clinical_data_p %>% 
+  select(age, AFP)
+clinical_data_p_qual <- clinical_data_p %>% 
+  select( Censored_0_progressed_1, hepatitis, Sex, Smoking, Alcohol,
+         fhx_can, fhx_livc, Diabetes, `Personal history of cancer`, Evidence_of_cirh, 
+         Pathology, tumor_nodul, `Vascular invasion`, Metastasis, Lymphnodes,
+         `Portal Vein Thrombosis`, T_involvment)
+```
+
+Calculem la correlació entre les variables numèriques. Aquesta és petita per tant
+no tenim cap problema.
+
+```{r}
+cor(age, AFP)
+```
+
+Vegem ara un diagrama de barres per a cada variable qualitativa.
+
+
+```{r}
+par(mfrow = c(1, 3))  # Dividir el área de la gráfica en múltiples paneles
+for (col in names(clinical_data_p_qual)) {
+  counts <- table(clinical_data_p_qual[[col]])
+  barplot(counts, main = paste("DB de", col))
+}
+```
+
+Eliminam les variables $fhx_livc$, $Metastasis$ i $Lymphnodes$ perquè tenim poques observacions d'un dels seus nivells.
+
+```{r}
+clinical_data_p <- clinical_data_p %>% 
+  select(-fhx_livc, -Metastasis, -Lymphnodes)
+```
+
+Ens quedam ara amb 16 variables.
+
+De les variables $Pathology$, $T-involvment$ i $tumor_nodul$, com presnten un ordre en els seus
+factors las codificam de manera ordinal
+
+```{r}
+clinical_data_p$T_involvment <- as.factor(clinical_data_p$T_involvment)
+levels(clinical_data_p$T_involvment) <- c(0,1)
+clinical_data_p$Pathology <- as.factor(clinical_data_p$Pathology)
+levels(clinical_data_p$Pathology) <- c(2,2,0,0,1,2,3)
+clinical_data_p$tumor_nodul <- as.factor(clinical_data_p$tumor_nodul)
+levels(clinical_data_p$tumor_nodul) <- c(1,0)
+```
+
+
+Finalment, a la variable $hepatitis$ emplearem la codificació one-hot ja que 
+presente factors sense cap tipus d'ordre.
+
+
+```{r}
+onehot <- model.matrix(~ . - 1, data = clinical_data_p[c("hepatitis")])
+clinical_data_p <- cbind(clinical_data_p, onehot)
+clinical_data_p <- clinical_data_p %>% 
+  select(-hepatitis, -`hepatitisNo virus`)
+
+
+names(clinical_data_p)[names(clinical_data_p) == "hepatitisHBV only"] <- "hepatitis_HBV_only"
+names(clinical_data_p)[names(clinical_data_p) == "hepatitisHCV only"] <- "hepatitis_HCV_only"
+names(clinical_data_p)[names(clinical_data_p) == "hepatitisHCV and HBV"] <- "hepatitis_HCV_HBV"
+```
+
+Una vegada realitzat tots els canvis, anem a guardar-ho en un .csv
+
+```{r}
+nombre_archivo <- "clinical_data_processed.csv"
+
+write.csv(clinical_data_p, file = nombre_archivo, row.names = FALSE)
 ```
 
