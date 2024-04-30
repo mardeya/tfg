@@ -126,3 +126,24 @@ nombre_archivo <- "clinical_data_processed.csv"
 write.csv(clinical_data_p, file = nombre_archivo, row.names = FALSE)
 ```
 
+
+
+## Regressió lineal
+
+```{r}
+clinical <- read.csv("clinical_data_processed.csv")
+str(clinical)
+```
+
+```{r}
+regressio_lineal = lm(OS ~. - TCIA_ID, data = clinical)
+summary(regressio_lineal)
+
+```
+```{r}
+plot(regressio_lineal)
+```
+
+Entre d'altres, el Multiple R-Squared és baix. Per tant, el model no és bo. 
+
+## Regressió LASSO
