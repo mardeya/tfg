@@ -6,14 +6,12 @@ editor: visual
 
 ## Paquets necessaris
 
-En primer lloc, carregarem a continuació els paquets necessaris per dur a terme 
-els diferents models o les diverses funcions de R que necessitarem
+En primer lloc, carregarem a continuació els paquets necessaris per dur a terme els diferents models o les diverses funcions de R que necessitarem
 
 ```{r}
 library(dplyr)
 library(readxl)
 ```
-
 
 ## Importar el dataset i processament
 
@@ -23,11 +21,7 @@ Primer de tot importam el dataset de les dades clíniques
 clinical_data <- read_excel("clinical_data.xlsx")
 ```
 
-
-
-Tenim un total de 105 observacions i 57 variables. D'aquestes variables ens
-interessen aquelles que descriuen l'estat clínic del pacient o aspectes biològics
-del malalt. Les seleccionam
+Tenim un total de 105 observacions i 57 variables. D'aquestes variables ens interessen aquelles que descriuen l'estat clínic del pacient o aspectes biològics del malalt. Les seleccionam
 
 ```{r}
 clinical_data_p <- clinical_data %>% 
@@ -37,18 +31,14 @@ clinical_data_p <- clinical_data %>%
          `Portal Vein Thrombosis`, T_involvment, AFP)
 ```
 
-Hem eliminat principalment les variables que eren estratificacions i les 
-classificacions dels pacients segons diverses entitats. Ens hem quedat ara amb
-22 variables. D'aquestes eliminam $Tr_Size$ ja que presenta valors NA.
+Hem eliminat principalment les variables que eren estratificacions i les classificacions dels pacients segons diverses entitats. Ens hem quedat ara amb 22 variables. D'aquestes eliminam $Tr_Size$ ja que presenta valors NA.
 
 ```{r}
 clinical_data_p <- clinical_data_p %>% 
   select(-Tr_Size)
 ```
 
-
-Vegem quines són les variables numèriques i quines són les qualitatives. Tenim que 
-$TCIA_ID$ és la clau primària i la nostra variable resposta, Y, és $OS$
+Vegem quines són les variables numèriques i quines són les qualitatives. Tenim que $TCIA_ID$ és la clau primària i la nostra variable resposta, Y, és $OS$
 
 ```{r}
 #attach(clinical_data_p)
@@ -62,15 +52,13 @@ clinical_data_p_qual <- clinical_data_p %>%
          `Portal Vein Thrombosis`, T_involvment)
 ```
 
-Calculem la correlació entre les variables numèriques. Aquesta és petita per tant
-no tenim cap problema.
+Calculem la correlació entre les variables numèriques. Aquesta és petita per tant no tenim cap problema.
 
 ```{r}
 cor(age, AFP)
 ```
 
 Vegem ara un diagrama de barres per a cada variable qualitativa.
-
 
 ```{r}
 par(mfrow = c(1, 3))  # Dividir el área de la gráfica en múltiples paneles
@@ -89,8 +77,7 @@ clinical_data_p <- clinical_data_p %>%
 
 Ens quedam ara amb 16 variables.
 
-De les variables $Pathology$, $T-involvment$ i $tumor_nodul$, com presnten un ordre en els seus
-factors las codificam de manera ordinal
+De les variables $Pathology$, $T-involvment$ i $tumor_nodul$, com presnten un ordre en els seus factors las codificam de manera ordinal
 
 ```{r}
 clinical_data_p$T_involvment <- as.factor(clinical_data_p$T_involvment)
@@ -101,10 +88,7 @@ clinical_data_p$tumor_nodul <- as.factor(clinical_data_p$tumor_nodul)
 levels(clinical_data_p$tumor_nodul) <- c(1,0)
 ```
 
-
-Finalment, a la variable $hepatitis$ emplearem la codificació one-hot ja que 
-presente factors sense cap tipus d'ordre.
-
+Finalment, a la variable $hepatitis$ emplearem la codificació one-hot ja que presente factors sense cap tipus d'ordre.
 
 ```{r}
 onehot <- model.matrix(~ . - 1, data = clinical_data_p[c("hepatitis")])
@@ -126,24 +110,23 @@ nombre_archivo <- "clinical_data_processed.csv"
 write.csv(clinical_data_p, file = nombre_archivo, row.names = FALSE)
 ```
 
-
-
-## Regressió lineal
+## Data train y data test
 
 ```{r}
-clinical <- read.csv("clinical_data_processed.csv")
-str(clinical)
+set.seed(2024)
+train <- sample(1:nrow(clinical_data_p), 70)
+test <- (-train)
+clinical_data_p_train <- clinical_data_p[train,]
+clinical_data_p_test <- clinical_data_p[test,]
 ```
+
 
 ```{r}
-regressio_lineal = lm(OS ~. - TCIA_ID, data = clinical)
-summary(regressio_lineal)
+nombre_archivo <- "clinical_data_processed_test.csv"
 
+write.csv(clinical_data_p_test, file = nombre_archivo, row.names = FALSE)
+
+nombre_archivo <- "clinical_data_processed_train.csv"
+
+write.csv(clinical_data_p_train, file = nombre_archivo, row.names = FALSE)
 ```
-```{r}
-plot(regressio_lineal)
-```
-
-Entre d'altres, el Multiple R-Squared és baix. Per tant, el model no és bo. 
-
-## Regressió LASSO
