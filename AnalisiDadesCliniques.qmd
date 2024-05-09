@@ -40,6 +40,7 @@ set.seed(2024)
 train = sample(1:nrow(clinical), 70)
 grid <- 10^seq(10,-2, length=100)
 modelo_lasso <- glmnet(matriz_pred[train, ], resposta[train], alpha = 1, lambda = grid)
+plot(modelo_lasso)
 ```
 
 ```{r}
