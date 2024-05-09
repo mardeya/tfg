@@ -41,7 +41,7 @@ clinical_data_p <- clinical_data_p %>%
 Vegem quines són les variables numèriques i quines són les qualitatives. Tenim que $TCIA_ID$ és la clau primària i la nostra variable resposta, Y, és $OS$
 
 ```{r}
-#attach(clinical_data_p)
+attach(clinical_data_p)
 
 clinical_data_p_numeriques <- clinical_data_p %>% 
   select(age, AFP)
@@ -100,6 +100,9 @@ clinical_data_p <- clinical_data_p %>%
 names(clinical_data_p)[names(clinical_data_p) == "hepatitisHBV only"] <- "hepatitis_HBV_only"
 names(clinical_data_p)[names(clinical_data_p) == "hepatitisHCV only"] <- "hepatitis_HCV_only"
 names(clinical_data_p)[names(clinical_data_p) == "hepatitisHCV and HBV"] <- "hepatitis_HCV_HBV"
+names(clinical_data_p)[names(clinical_data_p) == "Personal history of cancer"] <- "Personal_history_cancer"
+names(clinical_data_p)[names(clinical_data_p) == "Vascular invasion"] <- "hepatitis_HCV_HBV"
+names(clinical_data_p)[names(clinical_data_p) == "Portal Vein Thrombosis"] <- "Personal_history_cancer"
 ```
 
 Una vegada realitzat tots els canvis, anem a guardar-ho en un .csv
