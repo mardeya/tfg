@@ -102,7 +102,7 @@ names(clinical_data_p)[names(clinical_data_p) == "hepatitisHCV only"] <- "hepati
 names(clinical_data_p)[names(clinical_data_p) == "hepatitisHCV and HBV"] <- "hepatitis_HCV_HBV"
 names(clinical_data_p)[names(clinical_data_p) == "Personal history of cancer"] <- "Personal_history_cancer"
 names(clinical_data_p)[names(clinical_data_p) == "Vascular invasion"] <- "hepatitis_HCV_HBV"
-names(clinical_data_p)[names(clinical_data_p) == "Portal Vein Thrombosis"] <- "Personal_history_cancer"
+names(clinical_data_p)[names(clinical_data_p) == "Portal Vein Thrombosis"] <- "Portal_Vein_Thrombosis"
 ```
 
 Una vegada realitzat tots els canvis, anem a guardar-ho en un .csv
@@ -122,7 +122,6 @@ test <- (-train)
 clinical_data_p_train <- clinical_data_p[train,]
 clinical_data_p_test <- clinical_data_p[test,]
 ```
-
 
 ```{r}
 nombre_archivo <- "clinical_data_processed_test.csv"
