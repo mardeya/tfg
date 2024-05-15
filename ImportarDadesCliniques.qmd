@@ -26,8 +26,8 @@ Tenim un total de 105 observacions i 57 variables. D'aquestes variables ens inte
 ```{r}
 clinical_data_p <- clinical_data %>% 
   select(TCIA_ID, Censored_0_progressed_1, OS, hepatitis, age, Sex, Smoking, Alcohol,
-         fhx_can, fhx_livc, Diabetes, `Personal history of cancer`, Evidence_of_cirh, 
-         Pathology, Tr_Size, tumor_nodul, `Vascular invasion`, Metastasis, Lymphnodes,
+         fhx_can, fhx_livc, Diabetes, `Personal history of cancer`, Evidence_of_cirh,
+         Tr_Size, tumor_nodul, `Vascular invasion`, Metastasis, Lymphnodes,
          `Portal Vein Thrombosis`, T_involvment, AFP)
 ```
 
@@ -48,7 +48,7 @@ clinical_data_p_numeriques <- clinical_data_p %>%
 clinical_data_p_qual <- clinical_data_p %>% 
   select( Censored_0_progressed_1, hepatitis, Sex, Smoking, Alcohol,
          fhx_can, fhx_livc, Diabetes, `Personal history of cancer`, Evidence_of_cirh, 
-         Pathology, tumor_nodul, `Vascular invasion`, Metastasis, Lymphnodes,
+         , tumor_nodul, `Vascular invasion`, Metastasis, Lymphnodes,
          `Portal Vein Thrombosis`, T_involvment)
 ```
 
@@ -77,13 +77,11 @@ clinical_data_p <- clinical_data_p %>%
 
 Ens quedam ara amb 16 variables.
 
-De les variables $Pathology$, $T-involvment$ i $tumor_nodul$, com presnten un ordre en els seus factors las codificam de manera ordinal
+De les variables $T-involvment$ i $tumor_nodul$, com presnten un ordre en els seus factors las codificam de manera ordinal
 
 ```{r}
 clinical_data_p$T_involvment <- as.factor(clinical_data_p$T_involvment)
 levels(clinical_data_p$T_involvment) <- c(0,1)
-clinical_data_p$Pathology <- as.factor(clinical_data_p$Pathology)
-levels(clinical_data_p$Pathology) <- c(2,2,0,0,1,2,3)
 clinical_data_p$tumor_nodul <- as.factor(clinical_data_p$tumor_nodul)
 levels(clinical_data_p$tumor_nodul) <- c(1,0)
 ```
