@@ -4,7 +4,6 @@ format: html
 editor: visual
 ---
 
-
 ## Regressió lineal
 
 ```{r}
@@ -17,15 +16,16 @@ regressio_lineal = lm(OS ~. - TCIA_ID, data = clinical)
 summary(regressio_lineal)
 
 ```
+
 ```{r}
 plot(regressio_lineal)
 ```
 
-Entre d'altres, el Multiple R-Squared és baix. Per tant, el model no és bo. 
+Entre d'altres, el Multiple R-Squared és baix. Per tant, el model no és bo.
 
 ## Regressió LASSO
 
-Cream una matriu de  les variables predictors i un vector amb la resposta
+Cream una matriu de les variables predictors i un vector amb la resposta
 
 ```{r}
 matriz_pred <- clinical %>% 
@@ -59,7 +59,6 @@ lasso.coef <- predict(modelo_lasso, type = "coefficients", s = bestlam)
 lasso.coef
 ```
 
-
 ## Random forest
 
 ```{r}
@@ -75,7 +74,7 @@ yhat <- predict(rf.clinical_data, newdata = clinical[-train, ])
 clinical.test <- clinical[-train,]$OS
 mean((yhat - clinical.test)^2 )
 ```
+
 ```{r}
 importance(rf.clinical_data)
 ```
-

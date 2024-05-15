@@ -1,0 +1,23 @@
+---
+title: "DadesCliniques_NoLineals"
+format: html
+editor: visual
+---
+
+## Generalized Additive Models
+
+```{r}
+clinical <- read.csv("clinical_data_processed.csv")
+str(clinical)
+```
+```{r}
+library(splines)
+library(gam)
+gam1 <- gam(OS ~ns(age,5) + ns(AFP,5) + hepatitis_HCV_HBV.1 + Diabetes + Personal_history_cancer + tumor_nodul, data = clinical)
+plot(gam1, se = TRUE, col="blue")
+```
+
+```{r}
+summary(gam1)
+```
+
