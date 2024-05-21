@@ -10,7 +10,7 @@ Quarto enables you to weave together content and executable code into a finished
 ```{r}
 library(readr)
 radiomica_data <- read_csv("radiomica_data.csv")
-str(radiomica_data)
+#str(radiomica_data)
 ```
 
 
@@ -25,7 +25,7 @@ Ens falten dades del pacient 89.
 Matriu de correlacions
 
 ```{r}
-cor(radiomica_data_quant)
+#cor(radiomica_data_quant)
 ```
 
 
@@ -36,16 +36,13 @@ heatmap(cor(radiomica_data_quant))
 
 ## Estudi de colinearitat
 ```{r}
-# Paso 1: Calcular la matriz de correlación
+
 corr_matrix <- cor(radiomica_data_quant)
 
-# Paso 2: Identificar las correlaciones mayores a 0.8
 high_corr <- which(abs(corr_matrix) > 0.8 & upper.tri(corr_matrix), arr.ind = TRUE)
 
-# Paso 3: Contar cuántas veces aparece cada variable en las correlaciones
 var_counts <- table(c(rownames(corr_matrix)[high_corr[,1]], colnames(corr_matrix)[high_corr[,2]]))
 
-# Paso 4: Eliminar las variables redundantes basadas en la cuenta
 for (i in 1:nrow(high_corr)) {
   var1 <- rownames(corr_matrix)[high_corr[i, 1]]
   var2 <- colnames(corr_matrix)[high_corr[i, 2]]
@@ -69,7 +66,7 @@ heatmap(cor(radiomica_data_quant))
 ```{r}
 library(dplyr)
 
-# Estandarizar los datos utilizando scale() de dplyr
+# Estandaritzar les dades
 radiomica_data_quant <- as.data.frame(scale(radiomica_data_quant))
 ```
 
