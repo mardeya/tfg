@@ -1,0 +1,82 @@
+---
+title: "ImportarDadesRadiom"
+format: html
+editor: visual
+---
+
+## Quarto
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see 
+```{r}
+library(readr)
+radiomica_data <- read_csv("radiomica_data.csv")
+str(radiomica_data)
+```
+
+
+```{r}
+library(tidyverse)
+radiomica_data_quant <- radiomica_data %>% 
+  select(-Patient)
+```
+
+Ens falten dades del pacient 89.
+
+Matriu de correlacions
+
+```{r}
+cor(radiomica_data_quant)
+```
+
+
+```{r}
+library(ggplot2)
+heatmap(cor(radiomica_data_quant))
+```
+
+## Estudi de colinearitat
+```{r}
+# Paso 1: Calcular la matriz de correlación
+corr_matrix <- cor(radiomica_data_quant)
+
+# Paso 2: Identificar las correlaciones mayores a 0.8
+high_corr <- which(abs(corr_matrix) > 0.8 & upper.tri(corr_matrix), arr.ind = TRUE)
+
+# Paso 3: Contar cuántas veces aparece cada variable en las correlaciones
+var_counts <- table(c(rownames(corr_matrix)[high_corr[,1]], colnames(corr_matrix)[high_corr[,2]]))
+
+# Paso 4: Eliminar las variables redundantes basadas en la cuenta
+for (i in 1:nrow(high_corr)) {
+  var1 <- rownames(corr_matrix)[high_corr[i, 1]]
+  var2 <- colnames(corr_matrix)[high_corr[i, 2]]
+  if (var1 %in% colnames(radiomica_data_quant) && var2 %in% colnames(radiomica_data_quant)) {
+    if (var_counts[var1] <= var_counts[var2]) {
+      radiomica_data_quant <- radiomica_data_quant[, !colnames(radiomica_data_quant) %in% var1]
+    } else {
+      radiomica_data_quant <- radiomica_data_quant[, !colnames(radiomica_data_quant) %in% var2]
+    }
+  }
+}
+
+```
+
+
+```{r}
+heatmap(cor(radiomica_data_quant))
+```
+
+
+```{r}
+library(dplyr)
+
+# Estandarizar los datos utilizando scale() de dplyr
+radiomica_data_quant <- as.data.frame(scale(radiomica_data_quant))
+```
+
+```{r}
+nombre_archivo <- "radiomica_data_processed.csv"
+
+write.csv(radiomica_data_quant, file = nombre_archivo, row.names = FALSE)
+```
+
+
