@@ -16,6 +16,7 @@ radiomica_data <- read_csv("radiomica_data.csv")
 
 ```{r}
 library(tidyverse)
+Patient = radiomica_data$Patient
 radiomica_data_quant <- radiomica_data %>% 
   select(-Patient)
 ```
@@ -39,7 +40,7 @@ heatmap(cor(radiomica_data_quant))
 
 corr_matrix <- cor(radiomica_data_quant)
 
-high_corr <- which(abs(corr_matrix) > 0.8 & upper.tri(corr_matrix), arr.ind = TRUE)
+high_corr <- which(abs(corr_matrix) > 0.75 & upper.tri(corr_matrix), arr.ind = TRUE)
 
 var_counts <- table(c(rownames(corr_matrix)[high_corr[,1]], colnames(corr_matrix)[high_corr[,2]]))
 
@@ -71,9 +72,13 @@ radiomica_data_quant <- as.data.frame(scale(radiomica_data_quant))
 ```
 
 ```{r}
+radiomica_data <- cbind(Patient, radiomica_data_quant)
+```
+
+```{r}
 nombre_archivo <- "radiomica_data_processed.csv"
 
-write.csv(radiomica_data_quant, file = nombre_archivo, row.names = FALSE)
+write.csv(radiomica_data, file = nombre_archivo, row.names = FALSE)
 ```
 
 
