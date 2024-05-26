@@ -13,6 +13,11 @@ library(dplyr)
 library(readxl)
 ```
 
+```{r}
+colorTFG <- rgb(91, 200, 145, maxColorValue = 250)
+
+```
+
 ## Importar el dataset i processament
 
 Primer de tot importam el dataset de les dades clíniques
@@ -25,13 +30,13 @@ Tenim un total de 105 observacions i 57 variables. D'aquestes variables ens inte
 
 ```{r}
 clinical_data_p <- clinical_data %>% 
-  select(TCIA_ID, Censored_0_progressed_1, OS, hepatitis, age, Sex, Smoking, Alcohol,
+  select(TCIA_ID, OS, hepatitis, age, Sex, Smoking, Alcohol,
          fhx_can, fhx_livc, Diabetes, `Personal history of cancer`, Evidence_of_cirh,
          Tr_Size, tumor_nodul, `Vascular invasion`, Metastasis, Lymphnodes,
          `Portal Vein Thrombosis`, T_involvment, AFP)
 ```
 
-Hem eliminat principalment les variables que eren estratificacions i les classificacions dels pacients segons diverses entitats. Ens hem quedat ara amb 22 variables. D'aquestes eliminam $Tr_Size$ ja que presenta valors NA.
+Hem eliminat principalment les variables que eren estratificacions i les classificacions dels pacients segons diverses entitats. Ens hem quedat ara amb 20 variables. D'aquestes eliminam $Tr_Size$ ja que presenta valors NA.
 
 ```{r}
 clinical_data_p <- clinical_data_p %>% 
@@ -46,7 +51,7 @@ attach(clinical_data_p)
 clinical_data_p_numeriques <- clinical_data_p %>% 
   select(age, AFP)
 clinical_data_p_qual <- clinical_data_p %>% 
-  select( Censored_0_progressed_1, hepatitis, Sex, Smoking, Alcohol,
+  select( hepatitis, Sex, Smoking, Alcohol,
          fhx_can, fhx_livc, Diabetes, `Personal history of cancer`, Evidence_of_cirh, 
          , tumor_nodul, `Vascular invasion`, Metastasis, Lymphnodes,
          `Portal Vein Thrombosis`, T_involvment)
@@ -62,9 +67,14 @@ Vegem ara un diagrama de barres per a cada variable qualitativa.
 
 ```{r}
 par(mfrow = c(1, 3))  # Dividir el área de la gráfica en múltiples paneles
-for (col in names(clinical_data_p_qual)) {
-  counts <- table(clinical_data_p_qual[[col]])
-  barplot(counts, main = paste("DB de", col))
+
+for (i in seq_along(names(clinical_data_p_qual))) {
+  counts <- table(clinical_data_p_qual[[i]])
+  if (i == 1) {
+    barplot(counts, main = names(clinical_data_p_qual)[i], col = colorTFG, las = 2)
+  } else {
+    barplot(counts, main = names(clinical_data_p_qual)[i], col = colorTFG)
+  }
 }
 ```
 
@@ -92,12 +102,11 @@ Finalment, a la variable $hepatitis$ emplearem la codificació one-hot ja que pr
 onehot <- model.matrix(~ . - 1, data = clinical_data_p[c("hepatitis")])
 clinical_data_p <- cbind(clinical_data_p, onehot)
 clinical_data_p <- clinical_data_p %>% 
-  select(-hepatitis, -`hepatitisNo virus`)
+  select(-hepatitis, -`hepatitisNo virus`, - `hepatitisHCV and HBV`)
 
 
-names(clinical_data_p)[names(clinical_data_p) == "hepatitisHBV only"] <- "hepatitis_HBV_only"
-names(clinical_data_p)[names(clinical_data_p) == "hepatitisHCV only"] <- "hepatitis_HCV_only"
-names(clinical_data_p)[names(clinical_data_p) == "hepatitisHCV and HBV"] <- "hepatitis_HCV_HBV"
+names(clinical_data_p)[names(clinical_data_p) == "hepatitisHBV only"] <- "hepatitis_HBV"
+names(clinical_data_p)[names(clinical_data_p) == "hepatitisHCV only"] <- "hepatitis_HCV"
 names(clinical_data_p)[names(clinical_data_p) == "Personal history of cancer"] <- "Personal_history_cancer"
 names(clinical_data_p)[names(clinical_data_p) == "Vascular invasion"] <- "hepatitis_HCV_HBV"
 names(clinical_data_p)[names(clinical_data_p) == "Portal Vein Thrombosis"] <- "Portal_Vein_Thrombosis"
