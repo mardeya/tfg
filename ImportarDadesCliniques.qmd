@@ -108,7 +108,7 @@ clinical_data_p <- clinical_data_p %>%
 names(clinical_data_p)[names(clinical_data_p) == "hepatitisHBV only"] <- "hepatitis_HBV"
 names(clinical_data_p)[names(clinical_data_p) == "hepatitisHCV only"] <- "hepatitis_HCV"
 names(clinical_data_p)[names(clinical_data_p) == "Personal history of cancer"] <- "Personal_history_cancer"
-names(clinical_data_p)[names(clinical_data_p) == "Vascular invasion"] <- "hepatitis_HCV_HBV"
+names(clinical_data_p)[names(clinical_data_p) == "Vascular invasion"] <- "Vascular_Invasion"
 names(clinical_data_p)[names(clinical_data_p) == "Portal Vein Thrombosis"] <- "Portal_Vein_Thrombosis"
 ```
 

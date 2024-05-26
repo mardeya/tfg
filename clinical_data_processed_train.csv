@@ -1,4 +1,4 @@
-"TCIA_ID","OS","age","Sex","Smoking","Alcohol","fhx_can","Diabetes","Personal_history_cancer","Evidence_of_cirh","tumor_nodul","hepatitis_HCV_HBV","Portal_Vein_Thrombosis","T_involvment","AFP","hepatitis_HBV","hepatitis_HCV"
+"TCIA_ID","OS","age","Sex","Smoking","Alcohol","fhx_can","Diabetes","Personal_history_cancer","Evidence_of_cirh","tumor_nodul","Vascular_Invasion","Portal_Vein_Thrombosis","T_involvment","AFP","hepatitis_HBV","hepatitis_HCV"
 "HCC_066",48.42857143,60,2,0,0,1,0,0,1,"0",0,0,"1",5277.3,0,1
 "HCC_037",93.42857143,82,1,1,1,1,1,1,1,"1",0,0,"1",3.5,0,0
 "HCC_045",101.7142857,52,1,0,0,1,0,0,1,"1",0,0,"0",8.7,0,1
