@@ -82,7 +82,6 @@ nombre_archivo <- "radiomica_data_processed.csv"
 write.csv(radiomica_data, file = nombre_archivo, row.names = FALSE)
 ```
 
-
 ## Data train y data test
 
 ```{r}
@@ -102,4 +101,3 @@ nombre_archivo <- "radiomica_data_processed_train.csv"
 
 write.csv(radiomica_data_train, file = nombre_archivo, row.names = FALSE)
 ```
-
