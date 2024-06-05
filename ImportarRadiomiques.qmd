@@ -81,3 +81,25 @@ nombre_archivo <- "radiomica_data_processed.csv"
 
 write.csv(radiomica_data, file = nombre_archivo, row.names = FALSE)
 ```
+
+
+## Data train y data test
+
+```{r}
+set.seed(2024)
+train <- sample(1:nrow(radiomica_data), 70)
+test <- (-train)
+radiomica_data_train <- radiomica_data[train,]
+radiomica_data_test <- radiomica_data[test,]
+```
+
+```{r}
+nombre_archivo <- "radiomica_data_processed_test.csv"
+
+write.csv(radiomica_data_test, file = nombre_archivo, row.names = FALSE)
+
+nombre_archivo <- "radiomica_data_processed_train.csv"
+
+write.csv(radiomica_data_train, file = nombre_archivo, row.names = FALSE)
+```
+
