@@ -4,26 +4,103 @@ format: html
 editor: visual
 ---
 
-## Regressió lineal
+
+```{r}
+colorTFG <- rgb(91, 200, 145, maxColorValue = 250)
+```
+
+## Lectura de la base de dades
 
 ```{r}
 clinical <- read.csv("clinical_data_processed.csv")
-str(clinical)
+#str(clinical)
+
+clinical_train <- read.csv("clinical_data_processed_train.csv")
+#str(clinical_train)
+
+clinical_test <- read.csv("clinical_data_processed_test.csv")
+#str(clinical_test)
+```
+
+## Model baseline
+
+```{r}
+clinical_train_resposta <- clinical_train$OS
+clinical_test_resposta <- clinical_test$OS 
+clinical_test_id <- clinical_test$TCIA_ID
 ```
 
 ```{r}
-regressio_lineal = lm(OS ~. - TCIA_ID, data = clinical)
-summary(regressio_lineal)
+fi = mean(clinical_train_resposta)
+fi
+```
+Per tant, la predicció és $124.9$ setmanes.
 
+```{r}
+# Calculam R^2 de les dades test
+
+r2 = 1 - (sum((clinical_test_resposta - fi)^2)) / (sum((clinical_test_resposta - 
+                                                           mean(clinical_test_resposta))^2))
+r2
+
+mse = mean((clinical_test_resposta - fi)^2)
+
+mse
+```
+
+
+## Regressió lineal
+
+```{r}
+
+clinical_test <- clinical_test %>% select(-TCIA_ID)
+clinical_train <- clinical_train %>% select(-TCIA_ID)
 ```
 
 ```{r}
-plot(regressio_lineal)
+rl <- lm(OS ~ . , data = clinical_train)
+
+#summary(rl)
+
+predict <-  predict(rl, newdata = clinical_test)
+
+tabla_predict <- data.frame(clinical_test_id, predict, clinical_test_resposta)
+
+plot(x = clinical_test_resposta, y =predict, xlab = "Valors reals", ylab = "Predicció", main = 
+       "Comparació de la predicció amb els valors reals", ylim = c(0, 400), xlim = c(0,400), col = colorTFG, pch =16,
+     col.main = "black")
+abline(a = 0, b = 1, col = "red", lty = 2)
+
+
+```
+
+
+```{r}
+# Calulam MSE i R^2
+
+r2 = 1 - (sum((clinical_test_resposta - predict)^2)) / (sum((clinical_test_resposta - 
+                                                           mean(clinical_test_resposta))^2))
+r2
+
+mse = mean((clinical_test_resposta - predict)^2)
+
+mse
+```
+
+
+```{r}
+plot(rl)
 ```
 
 Entre d'altres, el Multiple R-Squared és baix. Per tant, el model no és bo.
 
 ## Regressió LASSO
+
+```{r}
+library(glmnet)
+library(dplyr)
+```
+
 
 Cream una matriu de les variables predictors i un vector amb la resposta
 
@@ -38,23 +115,22 @@ resposta <- clinical$OS
 ```{r}
 set.seed(2024)
 train = sample(1:nrow(clinical), 70)
-grid <- 10^seq(10,-2, length=100)
-modelo_lasso <- glmnet(matriz_pred[train, ], resposta[train], alpha = 1, lambda = grid)
-plot(modelo_lasso)
+modelo_lasso <- glmnet(matriz_pred[train, ], resposta[train], alpha = 1)
+plot(modelo_lasso, xvar = "lambda", xlab = expression(log(lambda)), ylab = "Coeficients")
+plot(modelo_lasso, xvar = "dev")
 ```
 
 ```{r}
 cv.out <- cv.glmnet(matriz_pred[train, ], resposta[train], alpha = 1)
-#plot(cv.out)
+plot(cv.out, main = expression("Error quadràtic mitjà - Paràmetre" ~ lambda))
 bestlam <- cv.out$lambda.min
 lasso.pred <- predict(modelo_lasso, s=bestlam, newx= matriz_pred[-train, ])
-mean((lasso.pred-resposta[-train])^2)
+#mean((lasso.pred-resposta[-train])^2)
 ```
 
 Finalment, aconseguim els valors dels coeficients
 
 ```{r}
-out <- glmnet(matriz_pred, resposta, alpha = 1, lambda = grid)
 lasso.coef <- predict(modelo_lasso, type = "coefficients", s = bestlam)
 lasso.coef
 ```
@@ -68,13 +144,67 @@ library(randomForest)
 ```{r}
 set.seed(2024)
 train = sample(1:nrow(clinical), 70)
-rf.clinical_data <- randomForest(OS ~. - TCIA_ID, data = clinical, subset = train, mtry = 10, 
-                                 importance = TRUE)
+rf.clinical_data <- randomForest(OS ~. - TCIA_ID, data = clinical, subset = train, mtry = 1)
+rf.clinical_data
 yhat <- predict(rf.clinical_data, newdata = clinical[-train, ])
 clinical.test <- clinical[-train,]$OS
 mean((yhat - clinical.test)^2 )
+#yhat
 ```
+
+
+```{r}
+oob.err = double(13)
+test.err = double(13)
+
+for (mtry in 1:15){
+  fit <- randomForest(OS ~. - TCIA_ID, data = clinical, subset = train, mtry = mtry)
+  oob.err[mtry] = fit$mse[600]
+  pred =  predict(fit, newdata = clinical[-train, ])
+  test.err[mtry] = with(clinical[-train,], mean((OS-pred)^2))
+  print(mtry)
+}
+
+test.err
+
+```
+
+```{r}
+# Calculam R^2 de les dades test
+
+r2 = 1 - (sum((clinical_test_resposta - yhat)^2)) / (sum((clinical_test_resposta - 
+                                                           mean(clinical_test_resposta))^2))
+r2
+
+mse = mean((clinical_test_resposta - yhat)^2)
+
+mse
+```
+
+
 
 ```{r}
 importance(rf.clinical_data)
 ```
+
+```{r}
+importance_df <- as.data.frame(importance(rf.clinical_data))
+
+# Afegir noms de columnes per claredat
+colnames(importance_df) <- c("IncNodePurity")
+
+# Ordenar les variables per importància decreixent
+importance_df$Variable <- rownames(importance_df)
+importance_df <- importance_df[order(importance_df$IncNodePurity, decreasing = TRUE), ]
+
+# Gràfica de barres de la importància de les variables
+ggplot(importance_df, aes(x = reorder(Variable, IncNodePurity), y = IncNodePurity), col = colorTFG) +
+  geom_bar(stat = "identity", fill = colorTFG) +
+  coord_flip() +
+  xlab("") +
+  ylab("Increment de la Puresa del Node (IncNodePurity)") +
+  ggtitle("Importància de les Variables en el Model de Random Forest") + 
+  theme_minimal()
+```
+
+## GAM

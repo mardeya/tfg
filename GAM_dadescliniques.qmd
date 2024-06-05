@@ -8,16 +8,34 @@ editor: visual
 
 ```{r}
 clinical <- read.csv("clinical_data_processed.csv")
-str(clinical)
+#str(clinical)
+colnames(clinical)
 ```
+
 ```{r}
 library(splines)
 library(gam)
-gam1 <- gam(OS ~ns(age,5) + ns(AFP,5) + hepatitis_HCV_HBV.1 + Diabetes + Personal_history_cancer + tumor_nodul, data = clinical)
-plot(gam1, se = TRUE, col="blue")
+
+gam2 <- gam(OS ~ns(age,5) + ns(AFP,5)+ Diabetes +Alcohol+ age + Sex + Smoking + T_involvment + Evidence_of_cirh + hepatitis_HCV + hepatitis_HBV + Portal_Vein_Thrombosis + Vascular_Invasion + tumor_nodul + Personal_history_cancer + fhx_can, data = clinical_train)
+plot(gam2, se = TRUE, col="blue")
 ```
 
 ```{r}
-summary(gam1)
+summary(gam2)
 ```
 
+```{r}
+pred = predict(gam2, newdata = clinical_test)
+pred
+```
+
+```{r}
+r2 = 1 - (sum((clinical_test_resposta - pred)^2)) / (sum((clinical_test_resposta - 
+                                                           mean(clinical_test_resposta))^2))
+r2
+
+mse = mean((clinical_test_resposta - pred)^2)
+
+mse
+
+```

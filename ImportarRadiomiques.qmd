@@ -6,13 +6,13 @@ editor: visual
 
 ## Quarto
 
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see 
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see
+
 ```{r}
 library(readr)
 radiomica_data <- read_csv("radiomica_data.csv")
 #str(radiomica_data)
 ```
-
 
 ```{r}
 library(tidyverse)
@@ -29,13 +29,13 @@ Matriu de correlacions
 #cor(radiomica_data_quant)
 ```
 
-
 ```{r}
 library(ggplot2)
 heatmap(cor(radiomica_data_quant))
 ```
 
 ## Estudi de colinearitat
+
 ```{r}
 
 corr_matrix <- cor(radiomica_data_quant)
@@ -58,11 +58,9 @@ for (i in 1:nrow(high_corr)) {
 
 ```
 
-
 ```{r}
 heatmap(cor(radiomica_data_quant))
 ```
-
 
 ```{r}
 library(dplyr)
@@ -73,6 +71,9 @@ radiomica_data_quant <- as.data.frame(scale(radiomica_data_quant))
 
 ```{r}
 radiomica_data <- cbind(Patient, radiomica_data_quant)
+OS = clinical$OS
+OS = OS[-89]
+radiomica_data <- cbind(radiomica_data,OS)
 ```
 
 ```{r}
@@ -80,5 +81,3 @@ nombre_archivo <- "radiomica_data_processed.csv"
 
 write.csv(radiomica_data, file = nombre_archivo, row.names = FALSE)
 ```
-
-
