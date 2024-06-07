@@ -4,7 +4,6 @@ format: html
 editor: visual
 ---
 
-
 ```{r}
 colorTFG <- rgb(91, 200, 145, maxColorValue = 250)
 ```
@@ -34,6 +33,7 @@ clinical_test_id <- clinical_test$TCIA_ID
 fi = mean(clinical_train_resposta)
 fi
 ```
+
 Per tant, la predicció és $124.9$ setmanes.
 
 ```{r}
@@ -47,7 +47,6 @@ mse = mean((clinical_test_resposta - fi)^2)
 
 mse
 ```
-
 
 ## Regressió lineal
 
@@ -74,7 +73,6 @@ abline(a = 0, b = 1, col = "red", lty = 2)
 
 ```
 
-
 ```{r}
 # Calulam MSE i R^2
 
@@ -86,7 +84,6 @@ mse = mean((clinical_test_resposta - predict)^2)
 
 mse
 ```
-
 
 ```{r}
 plot(rl)
@@ -100,7 +97,6 @@ Entre d'altres, el Multiple R-Squared és baix. Per tant, el model no és bo.
 library(glmnet)
 library(dplyr)
 ```
-
 
 Cream una matriu de les variables predictors i un vector amb la resposta
 
@@ -152,7 +148,6 @@ mean((yhat - clinical.test)^2 )
 #yhat
 ```
 
-
 ```{r}
 oob.err = double(13)
 test.err = double(13)
@@ -180,8 +175,6 @@ mse = mean((clinical_test_resposta - yhat)^2)
 
 mse
 ```
-
-
 
 ```{r}
 importance(rf.clinical_data)
