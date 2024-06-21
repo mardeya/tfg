@@ -11,13 +11,13 @@ colorTFG <- rgb(91, 200, 145, maxColorValue = 250)
 ## Lectura de la base de dades
 
 ```{r}
-clinical <- read.csv("clinical_data_processed.csv")
+clinical <- read.csv("Clinical_data/clinical_data_processed.csv")
 #str(clinical)
 
-clinical_train <- read.csv("clinical_data_processed_train.csv")
+clinical_train <- read.csv("Clinical_data/clinical_data_processed_train.csv")
 #str(clinical_train)
 
-clinical_test <- read.csv("clinical_data_processed_test.csv")
+clinical_test <- read.csv("Clinical_data/clinical_data_processed_test.csv")
 #str(clinical_test)
 ```
 
