@@ -8,20 +8,59 @@ editor: visual
 colorTFG <- rgb(91, 200, 145, maxColorValue = 250)
 ```
 
-## Lectura de la base de dades
+## Paquets necessaris
+
+A continuació, carregarem els paquets necessaris per a dur a terme l'estudi de les dades clíniques
 
 ```{r}
-clinical <- read.csv("Clinical_data/clinical_data_processed.csv")
+library(tidyverse)
+library(glmnet)
+library(dplyr)
+library(randomForest)
+library(splines)
+library(gam)
+```
+
+## Lectura de la base de dades
+
+Primer de tot llegim els csv generats durant el processament de les dades clíniques.
+
+```{r}
+clinical <- read.csv("Clinical Data csv/clinical_data_processed.csv")
 #str(clinical)
 
-clinical_train <- read.csv("Clinical_data/clinical_data_processed_train.csv")
+clinical_train <- read.csv("Clinical Data csv/clinical_data_processed_train.csv")
 #str(clinical_train)
 
-clinical_test <- read.csv("Clinical_data/clinical_data_processed_test.csv")
+clinical_test <- read.csv("Clinical Data csv/clinical_data_processed_test.csv")
 #str(clinical_test)
 ```
 
+## Funcions útils
+
+Funció que calcula el MSE:
+
+```{r}
+mse <- function(real, prediccio) {
+  return(mean((real - prediccio)^2))
+}
+```
+
+Funció que calcula el $R^2$:
+
+```{r}
+r_squared <- function(actual, predicted) {
+  
+  ss_residual <- sum((actual - predicted)^2)
+  ss_total <- sum((actual - mean(actual))^2)
+  
+  return(1 - (ss_residual / ss_total))
+}
+```
+
 ## Model baseline
+
+Realitzarem un model de referència que no utilitza cap variable amb l'objectiu de poder comparar-lo en el futur amb els nous models entrenats
 
 ```{r}
 clinical_train_resposta <- clinical_train$OS
@@ -29,26 +68,27 @@ clinical_test_resposta <- clinical_test$OS
 clinical_test_id <- clinical_test$TCIA_ID
 ```
 
+Calculam la mitjana de l'*OS* dels pacients inclosos en el connjunt d'entrenament.
+
 ```{r}
-fi = mean(clinical_train_resposta)
-fi
+prediccio = mean(clinical_train_resposta)
+prediccio
 ```
 
 Per tant, la predicció és $124.9$ setmanes.
 
 ```{r}
-# Calculam R^2 de les dades test
 
-r2 = 1 - (sum((clinical_test_resposta - fi)^2)) / (sum((clinical_test_resposta - 
-                                                           mean(clinical_test_resposta))^2))
-r2
+r2_base <- r_squared(clinical_test_resposta, prediccio)
+r2_base
 
-mse = mean((clinical_test_resposta - fi)^2)
-
-mse
+mse_base <- mse(clinical_test_resposta, prediccio)
+mse_base
 ```
 
 ## Regressió lineal
+
+Eliminam la variable que és la clau primària per a facilitar la implementació dels models.
 
 ```{r}
 
@@ -56,49 +96,69 @@ clinical_test <- clinical_test %>% select(-TCIA_ID)
 clinical_train <- clinical_train %>% select(-TCIA_ID)
 ```
 
+A continuació, construïm el model lineal amb les dades d'entrenament.
+
 ```{r}
 rl <- lm(OS ~ . , data = clinical_train)
 
-#summary(rl)
+summary(rl)
+```
 
+Ara, feim la predicció de la variable $OS$ utilitzant el model anterior damunt les dades test.
+
+```{r}
 predict <-  predict(rl, newdata = clinical_test)
 
 tabla_predict <- data.frame(clinical_test_id, predict, clinical_test_resposta)
+tabla_predict
 
 plot(x = clinical_test_resposta, y =predict, xlab = "Valors reals", ylab = "Predicció", main = 
        "Comparació de la predicció amb els valors reals", ylim = c(0, 400), xlim = c(0,400), col = colorTFG, pch =16,
      col.main = "black")
 abline(a = 0, b = 1, col = "red", lty = 2)
 
+```
+
+Calculam el MSE I $R^2$:
+
+```{r}
+
+r2_lineal <- r_squared(clinical_test_resposta, predict)
+r2_lineal
+
+mse_lineal <- mse(clinical_test_resposta, predict)
+mse_lineal
+```
+
+Finalment, observem la distribució dels residus.
+
+```{r}
+#plot(rl)
 
 ```
 
 ```{r}
-# Calulam MSE i R^2
+residuals <- resid(rl)
 
-r2 = 1 - (sum((clinical_test_resposta - predict)^2)) / (sum((clinical_test_resposta - 
-                                                           mean(clinical_test_resposta))^2))
-r2
+qq_plot <- ggplot(data.frame(residuals), aes(sample = residuals)) +
+  stat_qq(color = colorTFG, size = 2) + 
+  stat_qq_line(color = "red", linetype = "dashed", size = 1) + 
+  labs(title = "Q-Q Plot dels Residus", x = "Quantils Teòrics", y = "Quantils dels Residus") +
+  theme_minimal() + 
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12) 
+  )
 
-mse = mean((clinical_test_resposta - predict)^2)
-
-mse
+print(qq_plot)
 ```
-
-```{r}
-plot(rl)
-```
-
-Entre d'altres, el Multiple R-Squared és baix. Per tant, el model no és bo.
 
 ## Regressió LASSO
 
-```{r}
-library(glmnet)
-library(dplyr)
-```
+A n'aquesta secció implementarem el model LASSO a les dades clíniques
 
-Cream una matriu de les variables predictors i un vector amb la resposta
+Cream una matriu de les variables predictors i un vector amb la resposta.
 
 ```{r}
 matriz_pred <- clinical %>% 
@@ -108,13 +168,21 @@ matriz_pred <- clinical %>%
 resposta <- clinical$OS
 ```
 
+A continuació, entrenam el model a les dades d'entrenament
+
 ```{r}
+# Recordam que per a realitzar el conjunt train i test vam utilitzar la 
+# set.seed 2024
 set.seed(2024)
 train = sample(1:nrow(clinical), 70)
+
 modelo_lasso <- glmnet(matriz_pred[train, ], resposta[train], alpha = 1)
+
 plot(modelo_lasso, xvar = "lambda", xlab = expression(log(lambda)), ylab = "Coeficients")
 plot(modelo_lasso, xvar = "dev")
 ```
+
+Utilitzam cross-validation per a triar el valor òptim de lambda
 
 ```{r}
 cv.out <- cv.glmnet(matriz_pred[train, ], resposta[train], alpha = 1)
@@ -131,11 +199,28 @@ lasso.coef <- predict(modelo_lasso, type = "coefficients", s = bestlam)
 lasso.coef
 ```
 
-## Random forest
+Obtenim el mateix model de referència inicial.
+
+Si ara per exemple triam un valor de $\lambda$ que conservi almenys algunes variables, per exemple $\lambda = 15$ :
 
 ```{r}
-library(randomForest)
+lasso.pred <- predict(modelo_lasso, s=15, newx= matriz_pred[-train, ])
+lasso.coef <- predict(modelo_lasso, type = "coefficients", s = 15)
+lasso.coef
+
 ```
+
+Calculam el MSE I el $R^2$:
+
+```{r}
+r2_lasso <- r_squared(clinical_test_resposta, lasso.pred)
+r2_lasso
+
+mse_lasso <- mse(clinical_test_resposta, lasso.pred)
+mse_lasso
+```
+
+## Random forest
 
 ```{r}
 set.seed(2024)
@@ -146,6 +231,8 @@ yhat <- predict(rf.clinical_data, newdata = clinical[-train, ])
 clinical.test <- clinical[-train,]$OS
 mean((yhat - clinical.test)^2 )
 #yhat
+
+plot(rf.clinical_data)
 ```
 
 ```{r}
@@ -201,3 +288,28 @@ ggplot(importance_df, aes(x = reorder(Variable, IncNodePurity), y = IncNodePurit
 ```
 
 ## GAM
+
+```{r}
+gam2 <- gam(OS ~ns(age,5) + ns(AFP,5)+ Diabetes +Alcohol+ age + Sex + Smoking + T_involvment + Evidence_of_cirh + hepatitis_HCV + hepatitis_HBV + Portal_Vein_Thrombosis + Vascular_Invasion + tumor_nodul + Personal_history_cancer + fhx_can, data = clinical_train)
+plot(gam2, se = TRUE, col="blue")
+```
+
+```{r}
+summary(gam2)
+```
+
+```{r}
+pred = predict(gam2, newdata = clinical_test)
+pred
+```
+
+```{r}
+r2 = 1 - (sum((clinical_test_resposta - pred)^2)) / (sum((clinical_test_resposta - 
+                                                           mean(clinical_test_resposta))^2))
+r2
+
+mse = mean((clinical_test_resposta - pred)^2)
+
+mse
+
+```
