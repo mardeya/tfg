@@ -4,15 +4,28 @@ format: html
 editor: visual
 ---
 
-## Quarto
+## Paquets necessaris
 
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see
+En primer lloc, carregarem a continuació els paquets necessaris per dur a terme els diferents models o les diverses funcions de R que necessitarem. A més, carregam el color propi del nostre TFG.
 
 ```{r}
-library(readr)
-radiomica_data <- read_csv("radiomica_data.csv")
+library(dplyr)
+library(readxl)
+library(ggplot2)
+
+colorTFG <- rgb(91, 200, 145, maxColorValue = 250)
+```
+
+## Importar el dataset i processament
+
+Primer de tot, llegim el csv amb les caractrístiques radiòmiques:
+
+```{r}
+radiomica_data <- read_csv("Radiomica Data csv/radiomica_data.csv", show_col_types = FALSE)
 #str(radiomica_data)
 ```
+
+Seleccionam les dades quantitatives
 
 ```{r}
 library(tidyverse)
@@ -21,55 +34,25 @@ radiomica_data_quant <- radiomica_data %>%
   select(-Patient)
 ```
 
-Ens falten dades del pacient 89.
+Ens falten dades del pacient 98.
 
-Matriu de correlacions
-
-```{r}
-#cor(radiomica_data_quant)
-```
+Vegem la matriu de correlacions
 
 ```{r}
-library(ggplot2)
+cor(radiomica_data_quant)
 heatmap(cor(radiomica_data_quant))
 ```
-
-## Estudi de colinearitat
-
-```{r}
-
-corr_matrix <- cor(radiomica_data_quant)
-
-high_corr <- which(abs(corr_matrix) > 0.75 & upper.tri(corr_matrix), arr.ind = TRUE)
-
-var_counts <- table(c(rownames(corr_matrix)[high_corr[,1]], colnames(corr_matrix)[high_corr[,2]]))
-
-for (i in 1:nrow(high_corr)) {
-  var1 <- rownames(corr_matrix)[high_corr[i, 1]]
-  var2 <- colnames(corr_matrix)[high_corr[i, 2]]
-  if (var1 %in% colnames(radiomica_data_quant) && var2 %in% colnames(radiomica_data_quant)) {
-    if (var_counts[var1] <= var_counts[var2]) {
-      radiomica_data_quant <- radiomica_data_quant[, !colnames(radiomica_data_quant) %in% var1]
-    } else {
-      radiomica_data_quant <- radiomica_data_quant[, !colnames(radiomica_data_quant) %in% var2]
-    }
-  }
-}
-
-```
+A continuació estandaritzam les dades:
 
 ```{r}
-heatmap(cor(radiomica_data_quant))
-```
-
-```{r}
-library(dplyr)
-
-# Estandaritzar les dades
 radiomica_data_quant <- as.data.frame(scale(radiomica_data_quant))
 ```
 
+Adjuntam la variable $OS$ al dataframe de radiòmiques
+
 ```{r}
+clinical <- read.csv("Clinical Data csv/clinical_data_processed.csv")
+
 radiomica_data <- cbind(Patient, radiomica_data_quant)
 OS = clinical$OS
 OS = OS[-89]
@@ -83,6 +66,8 @@ write.csv(radiomica_data, file = nombre_archivo, row.names = FALSE)
 ```
 
 ## Data train y data test
+
+Cream el conjunt de dades d'entrenament i el conjunt de dades test
 
 ```{r}
 set.seed(2024)
