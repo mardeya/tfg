@@ -1,0 +1,320 @@
+---
+title: "analisi grups dades radiomiques"
+format: html
+editor: visual
+---
+
+## Paquets necessaris
+
+Primer de tot carregam tots el paquets necessaris i carregam el color propi de la memòria del TFG.
+
+```{r}
+library(glmnet)
+library(dplyr)
+library(readxl)
+library(ggplot2)
+library(factoextra)
+library(pls)
+library(randomForest)
+library(caret)
+
+colorTFG <- rgb(91, 200, 145, maxColorValue = 250)
+```
+
+## Carregar csv necessaris
+
+A continuació, llegim els csv pertinents:
+
+```{r}
+radiomica <- read.csv("radiomica_data_processed.csv")
+#str(clinical)
+
+radiomica_train <- read.csv("radiomica_data_processed_train.csv")
+#str(clinical_train)
+
+radiomica_test <- read.csv("radiomica_data_processed_test.csv")
+#str(clinical_test)
+```
+
+## Grups de característiques radiòmiques
+
+Ara hem d'extreure les característiques segons el grup que pertanyi. Utilitzarem la següent funció.
+
+```{r}
+grupo <- function(prefijo, data) {
+  df <- data %>%
+    select(starts_with(prefijo), OS)
+  return(df)
+}
+```
+
+### Firstorder
+
+```{r}
+firstorder <- grupo("original_firstorder", radiomica)
+firstorder_test <- grupo("original_firstorder", radiomica_test)
+firstorder_train <- grupo("original_firstorder", radiomica_train)
+```
+
+### Shape
+
+```{r}
+shape <- grupo("original_shape", radiomica)
+shape_test <- grupo("original_shape", radiomica_test)
+shape_train <- grupo("original_shape", radiomica_train)
+```
+
+### Gray Level Co-ocurrence Matrix
+
+```{r}
+glcm <- grupo("original_glcm", radiomica)
+glcm_test <- grupo("original_glcm", radiomica_test)
+glcm_train <- grupo("original_glcm", radiomica_train)
+```
+
+### Gray Level Run Length Matrix
+
+```{r}
+glrlm <- grupo("original_glrlm", radiomica)
+glrlm_test <- grupo("original_glrlm", radiomica_test)
+glrlm_train <- grupo("original_glrlm", radiomica_train)
+```
+
+### Gray Level Size Zone Matrix
+
+```{r}
+glszm <- grupo("original_glszm", radiomica)
+glszm_test <- grupo("original_glszm", radiomica_test)
+glszm_train <- grupo("original_glszm", radiomica_train)
+```
+
+### Neighbouring Gray Tone Difference Matrix
+
+```{r}
+ngtdm <- grupo("original_ngtdm", radiomica)
+ngtdm_test <- grupo("original_ngtdm", radiomica_test)
+ngtdm_train <- grupo("original_ngtdm", radiomica_train)
+```
+
+### Gray Level Dependece Matrix
+
+```{r}
+gldm <- grupo("original_gldm", radiomica)
+gldm_test <- grupo("original_gldm", radiomica_test)
+gldm_train <- grupo("original_gldm", radiomica_train)
+```
+
+## Llistes dels grups
+
+Ara cream tres llistes per tal de després mecanitzar el procés d'estudiar cada tipus de dada
+
+```{r}
+grups = list(firstorder, shape, glcm, glrlm, glszm, ngtdm, gldm)
+grups_test = list(firstorder_test, shape_test, glcm_test, glrlm_test, 
+                  glszm_test, ngtdm_test, gldm_test)
+grups_train = list(firstorder_train, shape_train, glcm_train, glrlm_train, 
+                  glszm_train, ngtdm_train, gldm_train)
+```
+
+## Funcions útils
+
+
+Ara finalment, una funció per a calcular les mètriques
+
+```{r}
+calcular_metriques <- function(llista_prediccions, llista_test, variable_resposta = "OS") {
+  
+  metriques <- list()
+  
+  for (i in seq_along(llista_prediccions)) {
+    
+    prediccions <- llista_prediccions[[i]]
+    dades_test <- llista_test[[i]]
+    
+    y_real <- dades_test[[variable_resposta]]
+    
+    mse <- mse(y_real, prediccions)
+    
+    r_squared <- r_squared(y_real, prediccions)
+    
+    metriques[[paste0("modelo_", i)]] <- list(
+      mse = mse,
+      r_squared = r_squared
+    )
+  }
+  
+  return(metriques)
+}
+```
+
+Funció que calcula el MSE:
+
+```{r}
+mse <- function(real, prediccio) {
+  return(mean((real - prediccio)^2))
+}
+```
+
+Funció que calcula el $R^2$:
+
+```{r}
+r_squared <- function(actual, predicted) {
+  
+  ss_residual <- sum((actual - predicted)^2)
+  ss_total <- sum((actual - mean(actual))^2)
+  
+  return(1 - (ss_residual / ss_total))
+}
+```
+
+## Regressió lineal
+
+La funció per a iterar els diferents grups i obtenir la regressió lineal
+
+```{r}
+regressio_lineal <- function(grups, variable_resposta = "OS") {
+  models <- list()
+  
+  for (i in seq_along(grups)) {
+    df <- grups[[i]]
+    
+    y <- df[[variable_resposta]]
+    X <- df[, !names(df) %in% variable_resposta]
+    
+    model <- lm(y ~ ., data = X)
+    
+    models[[paste0("modelo_", i)]] <- model
+  }
+  
+  return(models)
+}
+```
+
+Funció per a les prediccions de cada model:
+
+```{r}
+predict_models <- function(llista_models, llista_test) {
+
+  prediccions <- list()
+  
+  for (i in seq_along(llista_models)) {
+    model <- llista_models[[i]]
+    dades_test <- llista_test[[i]]
+
+    prediccio <- predict(model, newdata = dades_test)
+    
+    prediccions[[paste0("prediccion_", i)]] <- prediccio
+  }
+  
+  return(prediccions)
+}
+```
+
+```{r}
+regressions <- regressio_lineal(grups_train)
+prediccions <- predict_models(regressions, grups_test)
+metriques <- calcular_metriques(prediccions, grups_test)
+
+```
+
+## Regressió LASSO
+
+```{r}
+regressio_lasso_cv <- function(grups, variable_resposta = "OS") {
+  models <- list()
+  
+  for (i in seq_along(grups)) {
+    df <- grups[[i]]
+    
+    y <- as.matrix(df[[variable_resposta]])
+    X <- as.matrix(df[, !names(df) %in% variable_resposta])
+    
+    cv_model <- cv.glmnet(X, y, alpha = 1)
+    
+    models[[paste0("modelo_", i)]] <- cv_model
+  }
+  
+  return(models)
+}
+```
+
+Funció per a les prediccions de cada model:
+
+```{r}
+predict_models <- function(llista_models, llista_test) {
+
+  prediccions <- list()
+  
+  for (i in seq_along(llista_models)) {
+    model <- llista_models[[i]]
+    dades_test <- llista_test[[i]]
+    
+    X_test <- as.matrix(dades_test[, !names(dades_test) %in% "OS"])
+
+    prediccio <- predict(model, newx = X_test, s = 15)
+    
+    prediccions[[paste0("prediccion_", i)]] <- prediccio
+  }
+  
+  return(prediccions)
+}
+```
+
+
+```{r}
+regresions_lasso <- regressio_lasso_cv(grups_train)
+prediccions_lasso <- predict_models(regresions_lasso, grups_test)
+metriques_lasso <- calcular_metriques(prediccions_lasso, grups_test)
+```
+
+## Random Forest
+
+```{r}
+
+regressio_rf <- function(grups, variable_resposta = "OS") {
+  models <- list()
+  
+  for (i in seq_along(grups)) {
+    df <- grups[[i]]
+    
+    y <- df[[variable_resposta]]
+    X <- df[, !names(df) %in% variable_resposta]
+    
+    rf_model <- train(x = X, y = y, method = "rf",
+                      trControl = trainControl(method = "cv", number = 5))
+    
+    models[[paste0("modelo_", i)]] <- rf_model
+  }
+  
+  return(models)
+}
+```
+
+```{r}
+predect_models <- function(lista_modelos, lista_datos_test, variable_resposta = "OS") {
+  predicciones <- list()
+  
+  for (i in seq_along(lista_modelos)) {
+    model_info <- lista_modelos[[i]]
+    rf_model <- model_info$model
+    important_features <- model_info$important_features
+    datos_test <- lista_datos_test[[i]]
+    
+    X_test <- datos_test[, important_features]
+    
+    prediccion <- predict(rf_model, newdata = X_test)
+    
+    predicciones[[paste0("prediccion_", i)]] <- prediccion
+  }
+  
+  return(predicciones)
+}
+
+```
+
+```{r}
+regresions_rf <- regressio_rf(grups_train)
+prediccions_rf <- predict_models(regresions_rf, grups_test)
+metriques_rf <- calcular_metriques(prediccions_rf, grups_test)
+```
+

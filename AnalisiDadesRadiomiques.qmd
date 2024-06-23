@@ -4,11 +4,24 @@ format: html
 editor: visual
 ---
 
+## Paquets necessaris
+
+Primer de tot carregam tots el paquets necessaris i carregam el color propi de la memòria del TFG.
+
 ```{r}
+library(glmnet)
+library(dplyr)
+library(readxl)
+library(ggplot2)
+library(factoextra)
+library(pls)
+
 colorTFG <- rgb(91, 200, 145, maxColorValue = 250)
 ```
 
 ## Lectura de la base de dades
+
+A continuació, llegim els csv pertinents:
 
 ```{r}
 radiomica <- read.csv("radiomica_data_processed.csv")
@@ -21,7 +34,31 @@ radiomica_test <- read.csv("radiomica_data_processed_test.csv")
 #str(clinical_test)
 ```
 
+## Funcions útils
+
+Funció que calcula el MSE:
+
+```{r}
+mse <- function(real, prediccio) {
+  return(mean((real - prediccio)^2))
+}
+```
+
+Funció que calcula el $R^2$:
+
+```{r}
+r_squared <- function(actual, predicted) {
+  
+  ss_residual <- sum((actual - predicted)^2)
+  ss_total <- sum((actual - mean(actual))^2)
+  
+  return(1 - (ss_residual / ss_total))
+}
+```
+
 ## Model baseline
+
+Realitzarem un model de referència que no utilitza cap variable amb l'objectiu de poder comparar-lo en el futur amb els nous models entrenats
 
 ```{r}
 radiomica_train_resposta <- radiomica_train$OS
@@ -29,26 +66,31 @@ radiomica_test_resposta <- radiomica_test$OS
 radiomica_test_id <- radiomica_test$Patient
 ```
 
+Calculam la mitjana de l'*OS* dels pacients inclosos en el connjunt d'entrenament.
+
 ```{r}
-fi = mean(radiomica_train_resposta)
-fi
+prediccio = mean(radiomica_train_resposta)
+prediccio
 ```
 
-Per tant, la predicció és $125.77$ setmanes.
+Per tant, la predicció és $125.7776$ setmanes.
 
 ```{r}
-# Calculam R^2 de les dades test
 
-r2 = 1 - (sum((radiomica_test_resposta - fi)^2)) / (sum((radiomica_test_resposta - 
-                                                           mean(radiomica_test_resposta))^2))
-r2
+r2_base <- r_squared(radiomica_test_resposta, prediccio)
+r2_base
 
-mse = mean((radiomica_test_resposta - fi)^2)
-
-mse
+mse_base <- mse(radiomica_test_resposta, prediccio)
+mse_base
 ```
 
 ## Regressió lineal
+
+Realitzarem tres regressions lineals, cada una amb un mètode diferent per a afrontar el problema de grans dimensions
+
+### Selecció de variables
+
+Eliminam la variable que és la clau primària:
 
 ```{r}
 
@@ -56,11 +98,113 @@ radiomica_test <- radiomica_test %>% select(-Patient)
 radiomica_train <- radiomica_train %>% select(-Patient)
 ```
 
+Model base sense cap variable:
+
 ```{r}
-rl <- lm(OS ~ . , data = radiomica_train)
+rl_step <- lm(OS ~ 1 , data = radiomica_train)
 
-summary(rl)
+summary(rl_step)
+```
 
+
+```{r}
+rl_step <- step(rl_step, direction = "both")
+summary(rl_step)
+```
+### PCA
+
+A n'aquest apartat realitzarem un anàlisi de components principals i la posterior 
+regressió.
+
+Ens agafam les cinc primeres dimensions ja que agrupen el 80% de la variança.
+
+```{r}
+pcr.regression <- pcr(OS ~., data =  radiomica_train, scale = TRUE, validation = "CV") 
+summary(pcr.regression)
+```
+
+```{r}
+validationplot(pcr.regression, val.type = "MSEP")
+```
+
+
+Elegirem aleshores 6 components
+
+```{r}
+pcr.fit <- pcr(OS ~., data = radiomica_train , scale = TRUE, ncomp = 6)
+summary(pcr.fit)
+```
+```{r}
+pcr.pred <- predict(pcr.fit, radiomica_test, ncomp = 6)
+pcr.pred[,,]
+```
+
+```{r}
+mse(pcr.pred, radiomica_test$OS)
+r_squared(pcr.pred, radiomica_test$OS)
+```
+
+```{r}
+explained_variance <- explvar(pcr.regression)[0:10]
+```
+
+
+
+```{r}
+components_df <- data.frame(
+  Component = seq_along(explained_variance),
+  VarianceExplained = explained_variance
+)
+
+# Gráfico de codo
+ggplot(components_df, aes(x = Component)) +
+  geom_bar(aes(y = VarianceExplained), stat = "identity", fill = colorTFG) +
+  geom_line(aes(y = VarianceExplained, group = 1), color = "red") +
+  geom_point(aes(y = VarianceExplained), color = "red") +
+  geom_text(aes(y = VarianceExplained, label = sprintf("%.1f%%", VarianceExplained)), 
+            vjust = -0.5, size = 3) +
+  scale_x_continuous(breaks = seq_along(explained_variance)) +
+  labs(title = "Scree plot",
+       x = "Componentes Principales",
+       y = "Varianza Explicada (%)") +
+  theme_minimal()
+```
+
+### Anàlisi de la col·linealitat
+
+```{r}
+
+corr_matrix <- cor(radiomica_data_quant)
+
+high_corr <- which(abs(corr_matrix) > 0.75 & upper.tri(corr_matrix), arr.ind = TRUE)
+
+var_counts <- table(c(rownames(corr_matrix)[high_corr[,1]], colnames(corr_matrix)[high_corr[,2]]))
+
+for (i in 1:nrow(high_corr)) {
+  var1 <- rownames(corr_matrix)[high_corr[i, 1]]
+  var2 <- colnames(corr_matrix)[high_corr[i, 2]]
+  if (var1 %in% colnames(radiomica_data_quant) && var2 %in% colnames(radiomica_data_quant)) {
+    if (var_counts[var1] <= var_counts[var2]) {
+      radiomica_data_quant <- radiomica_data_quant[, !colnames(radiomica_data_quant) %in% var1]
+    } else {
+      radiomica_data_quant <- radiomica_data_quant[, !colnames(radiomica_data_quant) %in% var2]
+    }
+  }
+}
+
+```
+
+```{r}
+colorTFGi <- rgb(91, 200, 145, maxColorValue = 300)
+my_colors <- colorRampPalette(c("white", colorTFGi))(n = 299)
+#cor(radiomica_data_quant)
+heatmap(cor(radiomica_data_quant), col = my_colors )
+```
+
+
+
+
+```{r}
 predict <-  predict(rl, newdata = radiomica_test)
 
 tabla_predict <- data.frame(radiomica_test_id, predict, radiomica_test_resposta)
@@ -74,30 +218,9 @@ tabla_predict <- data.frame(radiomica_test_id, predict, radiomica_test_resposta)
 
 ```
 
-```{r}
-# Calulam MSE i R^2
-
-r2 = 1 - (sum((radiomica_test_resposta - predict)^2)) / (sum((radiomica_test_resposta - 
-                                                           mean(radiomica_test_resposta))^2))
-r2
-
-mse = mean((radiomica_test_resposta - predict)^2)
-
-mse
-```
-
-```{r}
-plot(rl)
-```
-
-Entre d'altres, el Multiple R-Squared és baix. Per tant, el model no és bo.
 
 ## Regressió LASSO
 
-```{r}
-library(glmnet)
-library(dplyr)
-```
 
 Cream una matriu de les variables predictors i un vector amb la resposta
 

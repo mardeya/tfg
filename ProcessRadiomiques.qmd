@@ -39,8 +39,10 @@ Ens falten dades del pacient 98.
 Vegem la matriu de correlacions
 
 ```{r}
-cor(radiomica_data_quant)
-heatmap(cor(radiomica_data_quant))
+colorTFGi <- rgb(91, 200, 145, maxColorValue = 300)
+my_colors <- colorRampPalette(c("white", colorTFGi))(n = 299)
+#cor(radiomica_data_quant)
+heatmap(cor(radiomica_data_quant), col = my_colors )
 ```
 A continuació estandaritzam les dades:
 
