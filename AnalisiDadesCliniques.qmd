@@ -18,7 +18,6 @@ library(glmnet)
 library(dplyr)
 library(randomForest)
 library(splines)
-library(gam)
 library(caret)
 library(mgcv)
 ```
@@ -380,7 +379,7 @@ En aquest apartat entrenarem el model GAM per a intentar trobar un relació no
 lineal entre els prdictors i la variable resposta.
 
 ```{r}
-gam2 <- gam(OS ~ s(age) + s(AFP)+ Diabetes +Alcohol + Sex + Smoking + T_involvment + Evidence_of_cirh + hepatitis_HCV + hepatitis_HBV + Portal_Vein_Thrombosis + Vascular_Invasion + tumor_nodul + Personal_history_cancer + fhx_can, data = clinical_train)
+gam2 <- gam::gam(OS ~ gam::s(age) + gam::s(AFP)+ Diabetes +Alcohol + Sex + Smoking + T_involvment + Evidence_of_cirh + hepatitis_HCV + hepatitis_HBV + Portal_Vein_Thrombosis + Vascular_Invasion + tumor_nodul + Personal_history_cancer + fhx_can, data = clinical_train)
 #summary(gam2)
 plot(gam2, se = TRUE, col=colorTFG)
 ```
@@ -388,11 +387,11 @@ plot(gam2, se = TRUE, col=colorTFG)
 Durem a terme la validació creuada
 ```{r}
 gam_model <- train(
-  OS ~ s(age) + s(AFP)+ Diabetes +Alcohol + Sex + Smoking + T_involvment + Evidence_of_cirh + hepatitis_HCV + hepatitis_HBV + Portal_Vein_Thrombosis + Vascular_Invasion + tumor_nodul + Personal_history_cancer + fhx_can,
+  OS ~ age + AFP + Diabetes +Alcohol + Sex + Smoking + T_involvment + Evidence_of_cirh + hepatitis_HCV + hepatitis_HBV + Portal_Vein_Thrombosis + Vascular_Invasion + tumor_nodul + Personal_history_cancer + fhx_can,
   data = clinical_train,
   method = "gam",
   trControl = train_control)
-
+gam_model
 ```
 
 
