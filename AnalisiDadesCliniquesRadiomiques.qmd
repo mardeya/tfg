@@ -1,5 +1,5 @@
 ---
-title: "analisi dades radiomiques"
+title: "estudi cliniques + radiomiques"
 format: html
 editor: visual
 ---
@@ -15,13 +15,13 @@ library(readxl)
 library(ggplot2)
 library(factoextra)
 library(pls)
+library(randomForest)
+library(caret)
 
 colorTFG <- rgb(91, 200, 145, maxColorValue = 250)
 ```
 
-## Lectura de la base de dades
-
-A continuació, llegim els csv pertinents:
+A continuació, llegim els csv necesaris:
 
 ```{r}
 radiomica <- read.csv("Radiomica Data csv/radiomica_data_processed.csv")
@@ -32,6 +32,38 @@ radiomica_train <- read.csv("Radiomica Data csv/radiomica_data_processed_train.c
 
 radiomica_test <- read.csv("Radiomica Data csv/radiomica_data_processed_test.csv")
 #str(clinical_test)
+```
+
+```{r}
+clinical <- read.csv("Clinical Data csv/clinical_data_processed.csv")
+#str(clinical)
+
+clinical_train <- read.csv("Clinical Data csv/clinical_data_processed_train.csv")
+#str(clinical_train)
+
+clinical_test <- read.csv("Clinical Data csv/clinical_data_processed_test.csv")
+#str(clinical_test)
+```
+
+## Processament de les dades
+
+Primer de tot, hem de juntar els csv's per tal de tenir les dades clíniques i les carcterístiques raidòmiques en un mateix dataset
+
+Eliminam el pacient 89 ja que no te característiques radiòmiques
+
+```{r}
+clinical <- clinical[-89,]
+clinical_test <- clinical_test[-32,]
+
+clinical <- clinical %>%  select(-OS)
+clinical_train <- clinical_train %>%  select(-OS)
+clinical_test <- clinical_test %>%  select(-OS)
+```
+
+```{r}
+clinical_radiomica <- cbind(clinical, radiomica)
+clinical_radiomica_test <- cbind(clinical_test, radiomica_test)
+clinical_radiomica_train <- cbind(clinical_train, radiomica_train)
 ```
 
 ## Funcions útils
@@ -56,34 +88,6 @@ r_squared <- function(actual, predicted) {
 }
 ```
 
-## Model baseline
-
-Realitzarem un model de referència que no utilitza cap variable amb l'objectiu de poder comparar-lo en el futur amb els nous models entrenats
-
-```{r}
-radiomica_train_resposta <- radiomica_train$OS
-radiomica_test_resposta <- radiomica_test$OS 
-radiomica_test_id <- radiomica_test$Patient
-```
-
-Calculam la mitjana de l'*OS* dels pacients inclosos en el connjunt d'entrenament.
-
-```{r}
-prediccio = mean(radiomica_train_resposta)
-prediccio
-```
-
-Per tant, la predicció és $125.7776$ setmanes.
-
-```{r}
-
-r2_base <- r_squared(radiomica_test_resposta, prediccio)
-r2_base
-
-mse_base <- mse(radiomica_test_resposta, prediccio)
-mse_base
-```
-
 ## Regressió lineal
 
 Realitzarem tres regressions lineals, cada una amb un mètode diferent per a afrontar el problema de grans dimensions
@@ -94,20 +98,20 @@ Eliminam la variable que és la clau primària:
 
 ```{r}
 
-radiomica_test <- radiomica_test %>% select(-Patient)
-radiomica_train <- radiomica_train %>% select(-Patient)
+clinical_radiomica_test <- clinical_radiomica_test %>% select(-TCIA_ID, - Patient)
+clinical_radiomica_train <- clinical_radiomica_train %>% select(-TCIA_ID, - Patient)
 ```
 
 Model base sense cap variable:
 
 ```{r}
-rl_step <- lm(OS ~ 1 , data = radiomica_train)
+rl_step <- lm(OS ~ 1 , data = clinical_radiomica_train)
 
 summary(rl_step)
 ```
 
 ```{r}
-rl_step <- step(rl_step, direction = "both")
+rl_step <- step(rl_step, direction = "forward")
 summary(rl_step)
 ```
 
@@ -118,7 +122,7 @@ A n'aquest apartat realitzarem un anàlisi de components principals i la posteri
 Ens agafam les cinc primeres dimensions ja que agrupen el 80% de la variança.
 
 ```{r}
-pcr.regression <- pcr(OS ~., data =  radiomica_train, scale = TRUE, validation = "CV") 
+pcr.regression <- pcr(OS ~., data = clinical_radiomica_train, scale = TRUE, validation = "CV") 
 summary(pcr.regression)
 ```
 
@@ -129,18 +133,18 @@ validationplot(pcr.regression, val.type = "MSEP")
 Elegirem aleshores 6 components
 
 ```{r}
-pcr.fit <- pcr(OS ~., data = radiomica_train , scale = TRUE, ncomp = 6)
+pcr.fit <- pcr(OS ~., data = clinical_radiomica_train, scale = TRUE, ncomp = 8)
 summary(pcr.fit)
 ```
 
 ```{r}
-pcr.pred <- predict(pcr.fit, radiomica_test, ncomp = 6)
+pcr.pred <- predict(pcr.fit, clinical_radiomica_test, ncomp = 6)
 pcr.pred[,,]
 ```
 
 ```{r}
-mse(pcr.pred, radiomica_test$OS)
-r_squared(pcr.pred, radiomica_test$OS)
+mse(pcr.pred, clinical_radiomica_test$OS)
+r_squared(pcr.pred, clinical_radiomica_test$OS)
 ```
 
 ```{r}
@@ -168,6 +172,7 @@ ggplot(components_df, aes(x = Component)) +
 ```
 
 ### Anàlisi de la col·linealitat
+
 
 ```{r}
 
@@ -212,21 +217,23 @@ tabla_predict <- data.frame(radiomica_test_id, predict, radiomica_test_resposta)
 
 ```
 
-## Regressió LASSO
+
+## LASSO
 
 Cream una matriu de les variables predictors i un vector amb la resposta
 
 ```{r}
-matriz_pred <- radiomica %>% 
-  select(-Patient, -OS) %>% 
+resposta <-clinical_radiomica$OS
+
+matriz_pred <- clinical_radiomica %>% 
+  select(-Patient, -OS, - Patient) %>% 
   as.matrix()
 
-resposta <-radiomica$OS
 ```
 
 ```{r}
 set.seed(2024)
-train = sample(1:nrow(radiomica), 70)
+train = sample(1:nrow(clinical_radiomica), 70)
 modelo_lasso <- glmnet(matriz_pred[train, ], resposta[train], alpha = 1)
 plot(modelo_lasso, xvar = "lambda", xlab = expression(log(lambda)), ylab = "Coeficients")
 plot(modelo_lasso, xvar = "dev")
@@ -246,74 +253,5 @@ Finalment, aconseguim els valors dels coeficients
 lasso.coef <- predict(modelo_lasso, type = "coefficients", s = bestlam)
 lasso.coef
 ```
+## Random Forest
 
-## Random forest
-
-```{r}
-library(randomForest)
-```
-
-```{r}
-set.seed(2024)
-train = sample(1:nrow(radiomica), 70)
-rf.radiomica_data <- randomForest(OS ~. - Patient, data = radiomica, subset = train, mtry = 1)
-rf.radiomica_data
-yhat <- predict(rf.radiomica_data, newdata = radiomica[-train, ])
-clinical.test <- radiomica[-train,]$OS
-mean((yhat - radiomica_test_resposta)^2 )
-#yhat
-```
-
-```{r}
-oob.err = double(13)
-test.err = double(13)
-
-for (mtry in 1:15){
-  fit <- randomForest(OS ~. - Patient, data = radiomica, subset = train, mtry = mtry)
-  oob.err[mtry] = fit$mse[600]
-  pred =  predict(fit, newdata = radiomica[-train, ])
-  test.err[mtry] = with(radiomica[-train,], mean((OS-pred)^2))
-  print(mtry)
-}
-
-test.err
-
-```
-
-```{r}
-# Calculam R^2 de les dades test
-
-r2 = 1 - (sum((radiomica_test_resposta - yhat)^2)) / (sum((radiomica_test_resposta - 
-                                                           mean(radiomica_test_resposta))^2))
-r2
-
-mse = mean((radiomica_test_resposta - yhat)^2)
-
-mse
-```
-
-```{r}
-importance(rf.radiomica_data)
-```
-
-```{r}
-importance_df <- as.data.frame(importance(rf.radiomica_data))
-
-# Afegir noms de columnes per claredat
-colnames(importance_df) <- c("IncNodePurity")
-
-# Ordenar les variables per importància decreixent
-importance_df$Variable <- rownames(importance_df)
-importance_df <- importance_df[order(importance_df$IncNodePurity, decreasing = TRUE), ]
-
-# Gràfica de barres de la importància de les variables
-ggplot(importance_df, aes(x = reorder(Variable, IncNodePurity), y = IncNodePurity), col = colorTFG) +
-  geom_bar(stat = "identity", fill = colorTFG) +
-  coord_flip() +
-  xlab("") +
-  ylab("Increment de la Puresa del Node (IncNodePurity)") +
-  ggtitle("Importància de les Variables en el Model de Random Forest") + 
-  theme_minimal()
-```
-
-## GAM

@@ -118,7 +118,6 @@ grups_train = list(firstorder_train, shape_train, glcm_train, glrlm_train,
 
 ## Funcions útils
 
-
 Ara finalment, una funció per a calcular les mètriques
 
 ```{r}
@@ -260,7 +259,6 @@ predict_models <- function(llista_models, llista_test) {
 }
 ```
 
-
 ```{r}
 regresions_lasso <- regressio_lasso_cv(grups_train)
 prediccions_lasso <- predict_models(regresions_lasso, grups_test)
@@ -317,4 +315,3 @@ regresions_rf <- regressio_rf(grups_train)
 prediccions_rf <- predict_models(regresions_rf, grups_test)
 metriques_rf <- calcular_metriques(prediccions_rf, grups_test)
 ```
-
