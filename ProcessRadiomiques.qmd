@@ -44,6 +44,7 @@ my_colors <- colorRampPalette(c("white", colorTFGi))(n = 299)
 #cor(radiomica_data_quant)
 heatmap(cor(radiomica_data_quant), col = my_colors )
 ```
+
 A continuació estandaritzam les dades:
 
 ```{r}

@@ -15,6 +15,9 @@ library(readxl)
 library(ggplot2)
 library(factoextra)
 library(pls)
+library(gplots)
+library(caret)
+library(randomForest)
 
 colorTFG <- rgb(91, 200, 145, maxColorValue = 250)
 ```
@@ -54,6 +57,12 @@ r_squared <- function(actual, predicted) {
   
   return(1 - (ss_residual / ss_total))
 }
+```
+
+Per a utilitzar validació creuada:
+
+```{r}
+train_control <- trainControl(method = "cv", number = 5)
 ```
 
 ## Model baseline
@@ -107,7 +116,7 @@ summary(rl_step)
 ```
 
 ```{r}
-rl_step <- step(rl_step, direction = "both")
+rl_step <- step(rl_step, direction = "both", trace = TRUE)
 summary(rl_step)
 ```
 
@@ -129,12 +138,12 @@ validationplot(pcr.regression, val.type = "MSEP")
 Elegirem aleshores 6 components
 
 ```{r}
-pcr.fit <- pcr(OS ~., data = radiomica_train , scale = TRUE, ncomp = 6)
+pcr.fit <- pcr(OS ~., data = radiomica_train , scale = TRUE, ncomp = 15)
 summary(pcr.fit)
 ```
 
 ```{r}
-pcr.pred <- predict(pcr.fit, radiomica_test, ncomp = 6)
+pcr.pred <- predict(pcr.fit, radiomica_test, ncomp = 10)
 pcr.pred[,,]
 ```
 
@@ -169,7 +178,12 @@ ggplot(components_df, aes(x = Component)) +
 
 ### Anàlisi de la col·linealitat
 
+A continuació, realitzarem un anàlisi de col·linealitat per a eliminar les variables altament correlacionades.
+
 ```{r}
+OS <- radiomica_train$OS
+radiomica_data_quant <- radiomica_train %>% 
+  select(-OS)
 
 corr_matrix <- cor(radiomica_data_quant)
 
@@ -191,34 +205,97 @@ for (i in 1:nrow(high_corr)) {
 
 ```
 
+Ara vegem un mapa de calor de les variables finals
+
 ```{r}
 colorTFGi <- rgb(91, 200, 145, maxColorValue = 300)
 my_colors <- colorRampPalette(c("white", colorTFGi))(n = 299)
 #cor(radiomica_data_quant)
-heatmap(cor(radiomica_data_quant), col = my_colors )
+heatmap(cor(radiomica_data_quant), col = my_colors,cexCol = 0.8,
+           margins = c(17, 4))
 ```
 
 ```{r}
-predict <-  predict(rl, newdata = radiomica_test)
+radiomica_colin_train <- cbind(radiomica_data_quant,OS)
+radiomica_colin_test <- radiomica_test[, colnames(radiomica_colin_train)]
+```
 
-tabla_predict <- data.frame(radiomica_test_id, predict, radiomica_test_resposta)
+A continuació, construïm el model lineal amb les dades d'entrenament.
 
-#plot(x = radiomica_test_resposta, y =predict, xlab = "Valors reals", ylab = "Predicció", main = 
-    #   "Comparació de la predicció amb els valors reals", ylim = c(0, 400), xlim = c(0,400), col = colorTFG, pch 
-      # =16,
-#     col.main = "black")
-#abline(a = 0, b = 1, col = "red", lty = 2)
+```{r}
+rl <- lm(OS ~ . , data = radiomica_colin_train)
 
+summary(rl)
+```
+
+```{r}
+model <- train(
+  OS ~ .,
+  data = radiomica_colin_train,
+  trControl = train_control
+)
+print(model)
+```
+
+Predicció sobre dades test
+
+```{r}
+predict <-  predict(rl, newdata = radiomica_colin_test)
+
+#tabla_predict <- data.frame(radiomica_test_id, predict, radiomica_test_resposta)
+
+plot(x = radiomica_test_resposta, y =predict, xlab = "Valors reals", ylab = "Predicció", main = 
+       "Comparació de la predicció amb els valors reals", ylim = c(0, 400), xlim = c(0,400), col = colorTFG, pch 
+       =16,
+     col.main = "black")
+abline(a = 0, b = 1, col = "red", lty = 2)
 
 ```
 
-## Regressió LASSO
+## 
+
+Calculam el MSE I $R^2$:
+
+```{r}
+
+r2_lineal <- r_squared(radiomica_test_resposta, predict)
+r2_lineal
+
+mse_lineal <- mse(radiomica_test_resposta, predict)
+mse_lineal
+```
+
+Finalment, observem la distribució dels residus.
+
+```{r}
+#plot(rl)
+
+```
+
+```{r}
+residuals <- resid(rl)
+
+qq_plot <- ggplot(data.frame(residuals), aes(sample = residuals)) +
+  stat_qq(color = colorTFG, size = 2) + 
+  stat_qq_line(color = "red", linetype = "dashed", size = 1) + 
+  labs(title = "Q-Q Plot dels Residus", x = "Quantils Teòrics", y = "Quantils dels Residus") +
+  theme_minimal() + 
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12) 
+  )
+
+print(qq_plot)
+```
+
+##  Regressió LASSO
 
 Cream una matriu de les variables predictors i un vector amb la resposta
 
 ```{r}
-matriz_pred <- radiomica %>% 
-  select(-Patient, -OS) %>% 
+matriz_pred <- radiomica[, colnames(radiomica_colin_train)] %>% 
+  select(-OS) %>% 
   as.matrix()
 
 resposta <-radiomica$OS
@@ -234,7 +311,7 @@ plot(modelo_lasso, xvar = "dev")
 
 ```{r}
 cv.out <- cv.glmnet(matriz_pred[train, ], resposta[train], alpha = 1)
-plot(cv.out, main = expression("Error quadràtic mitjà - Paràmetre" ~ lambda))
+plot(cv.out)
 bestlam <- cv.out$lambda.min
 lasso.pred <- predict(modelo_lasso, s=bestlam, newx= matriz_pred[-train, ])
 #mean((lasso.pred-resposta[-train])^2)
@@ -243,20 +320,44 @@ lasso.pred <- predict(modelo_lasso, s=bestlam, newx= matriz_pred[-train, ])
 Finalment, aconseguim els valors dels coeficients
 
 ```{r}
-lasso.coef <- predict(modelo_lasso, type = "coefficients", s = bestlam)
+lasso.coef <- predict(modelo_lasso, type = "coefficients", s = 10)
 lasso.coef
+```
+
+Calculam el MSE I el $R^2$:
+
+```{r}
+r2_lasso <- r_squared(radiomica_test_resposta, lasso.pred)
+r2_lasso
+
+mse_lasso <- mse(radiomica_test_resposta, lasso.pred)
+mse_lasso
+
+#adjusted_r2_lasso <- adjusted_r2(r2_lasso, 35, 11)
+#adjusted_r2_lasso
+```
+
+Validació creuada del model
+
+```{r}
+lasso_model <- train(matriz_pred[train,], resposta[train],
+                     method = "glmnet",
+                     trControl = train_control,
+                     tuneGrid = expand.grid(alpha = 1, lambda = 5)
+)
+print(lasso_model)
 ```
 
 ## Random forest
 
-```{r}
-library(randomForest)
-```
+En aquest apartat, entrenarem el Random Forest
 
 ```{r}
 set.seed(2024)
 train = sample(1:nrow(radiomica), 70)
-rf.radiomica_data <- randomForest(OS ~. - Patient, data = radiomica, subset = train, mtry = 1)
+
+radiomica <- radiomica[,colnames(radiomica_colin_train)]
+rf.radiomica_data <- randomForest(OS ~. , data = radiomica, subset = train, mtry = 1)
 rf.radiomica_data
 yhat <- predict(rf.radiomica_data, newdata = radiomica[-train, ])
 clinical.test <- radiomica[-train,]$OS
@@ -269,28 +370,44 @@ oob.err = double(13)
 test.err = double(13)
 
 for (mtry in 1:15){
-  fit <- randomForest(OS ~. - Patient, data = radiomica, subset = train, mtry = mtry)
+  fit <- randomForest(OS ~., data = radiomica, subset = train, mtry = mtry)
   oob.err[mtry] = fit$mse[600]
   pred =  predict(fit, newdata = radiomica[-train, ])
   test.err[mtry] = with(radiomica[-train,], mean((OS-pred)^2))
-  print(mtry)
 }
 
 test.err
 
 ```
 
+
+Validació creuada
+
 ```{r}
+
+rf_model <- train(matriz_pred[train,], resposta[train],
+                  method = "rf",
+                  trControl = train_control,
+                  metric = "Rsquared")
+print(rf_model)
+
+```
+
+Calculam les mètriques de l'ajustament
+
+```{r}
+
 # Calculam R^2 de les dades test
 
-r2 = 1 - (sum((radiomica_test_resposta - yhat)^2)) / (sum((radiomica_test_resposta - 
-                                                           mean(radiomica_test_resposta))^2))
-r2
+r2_rf <- r_squared(radiomica_test_resposta, yhat)
+r2_rf
 
-mse = mean((radiomica_test_resposta - yhat)^2)
+mse_rf <- mse(radiomica_test_resposta,yhat)
 
-mse
-```
+mse_rf
+``` 
+
+Finalment, vegem quines han estat les variables més importants a l'hora de crear el noste model.
 
 ```{r}
 importance(rf.radiomica_data)
@@ -312,8 +429,56 @@ ggplot(importance_df, aes(x = reorder(Variable, IncNodePurity), y = IncNodePurit
   coord_flip() +
   xlab("") +
   ylab("Increment de la Puresa del Node (IncNodePurity)") +
-  ggtitle("Importància de les Variables en el Model de Random Forest") + 
+  ggtitle("Importància de les Variables en el Random Forest") + 
   theme_minimal()
 ```
 
 ## GAM
+
+En aquest apartat entrenarem el model GAM per a intentar trobar un relació no lineal entre els prdictors i la variable resposta.
+```{r}
+importance_df
+```
+
+
+```{r}
+gam2 <- gam::gam(OS ~ gam::s(original_shape_SurfaceVolumeRatio) + gam::s(original_shape_SurfaceArea) +
+                   gam::s(original_glcm_SumAverage) + gam::s(original_glszm_SmallAreaEmphasis) + 
+                    gam::s(original_firstorder_MeanAbsoluteDeviation) + gam::s(original_glrlm_GrayLevelNonUniformity)
+                 , data = radiomica_colin_train)
+#summary(gam2)
+plot(gam2, se = TRUE, col=colorTFG)
+```
+
+Durem a terme la validació creuada
+
+```{r}
+gam_model <- train(
+  OS ~ original_shape_SurfaceVolumeRatio + original_shape_SurfaceArea +
+                  original_glcm_SumAverage + original_glszm_SmallAreaEmphasis + 
+                    original_firstorder_MeanAbsoluteDeviation + original_glrlm_GrayLevelNonUniformity,
+  data = radiomica_colin_train,
+  method = "gam",
+  trControl = train_control)
+gam_model
+```
+
+```{r}
+summary(gam2)
+```
+
+```{r}
+pred = predict(gam2, newdata = radiomica_colin_test)
+pred
+```
+Calculam les mètriques d'ajustament
+
+```{r}
+r2_gam <- r_squared(radiomica_test_resposta, pred)
+r2_gam
+
+mse_gam <- mse(radiomica_test_resposta, pred)
+mse_gam
+
+```
+

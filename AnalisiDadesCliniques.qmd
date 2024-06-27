@@ -279,6 +279,7 @@ abline(a = 0, b = 1, col = "red", lty = 2)
 ## Random forest
 
 En aquest apartat, entrenarem el model de Random Forest a les nostres dades clíniques.
+
 ```{r}
 set.seed(2024)
 train = sample(1:nrow(clinical), 70)
@@ -291,7 +292,9 @@ mean((yhat - clinical.test)^2 )
 
 plot(rf.clinical_data)
 ```
+
 Vegem quina mètrica seleccionar per a entrenar el nostre model.
+
 ```{r}
 oob.err = double(13)
 test.err = double(13)
@@ -304,7 +307,6 @@ for (mtry in 1:15){
 }
 
 ```
-
 
 ```{r}
 plot(1:15, test.err, type = "b", pch = 19, col = colorTFG, 
@@ -320,6 +322,7 @@ min_mtry <- which(test.err == min_test_err)
 points(min_mtry, min_test_err, col = "red", pch = 19)
 text(min_mtry + 0.5, min_test_err, paste("Mínim MSE"), pos = 4, col = "red")
 ```
+
 Validació creuada
 
 ```{r}
@@ -329,7 +332,6 @@ rf_model <- train(matriz_pred[train,], resposta[train],
                   metric = "Rsquared")
 print(rf_model)
 ```
-
 
 Calculam les mètriques de l'ajustament
 
@@ -344,9 +346,8 @@ mse_rf <- mse(clinical_test_resposta,yhat)
 mse_rf
 ```
 
+Finalment, vegem quines han estat les variables més importants a l'hora de crear el noste model.
 
-Finalment, vegem quines han estat les variables més importants a l'hora de crear 
-el noste model.
 ```{r}
 importance(rf.clinical_data)
 ```
@@ -371,12 +372,9 @@ ggplot(importance_df, aes(x = reorder(Variable, IncNodePurity), y = IncNodePurit
   theme_minimal()
 ```
 
-
-
 ## GAM
 
-En aquest apartat entrenarem el model GAM per a intentar trobar un relació no 
-lineal entre els prdictors i la variable resposta.
+En aquest apartat entrenarem el model GAM per a intentar trobar un relació no lineal entre els prdictors i la variable resposta.
 
 ```{r}
 gam2 <- gam::gam(OS ~ gam::s(age) + gam::s(AFP)+ Diabetes +Alcohol + Sex + Smoking + T_involvment + Evidence_of_cirh + hepatitis_HCV + hepatitis_HBV + Portal_Vein_Thrombosis + Vascular_Invasion + tumor_nodul + Personal_history_cancer + fhx_can, data = clinical_train)
@@ -385,6 +383,7 @@ plot(gam2, se = TRUE, col=colorTFG)
 ```
 
 Durem a terme la validació creuada
+
 ```{r}
 gam_model <- train(
   OS ~ age + AFP + Diabetes +Alcohol + Sex + Smoking + T_involvment + Evidence_of_cirh + hepatitis_HCV + hepatitis_HBV + Portal_Vein_Thrombosis + Vascular_Invasion + tumor_nodul + Personal_history_cancer + fhx_can,
@@ -393,7 +392,6 @@ gam_model <- train(
   trControl = train_control)
 gam_model
 ```
-
 
 ```{r}
 summary(gam2)
