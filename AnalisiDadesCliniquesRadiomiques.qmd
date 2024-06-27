@@ -173,7 +173,6 @@ ggplot(components_df, aes(x = Component)) +
 
 ### Anàlisi de la col·linealitat
 
-
 ```{r}
 
 corr_matrix <- cor(radiomica_data_quant)
@@ -217,7 +216,6 @@ tabla_predict <- data.frame(radiomica_test_id, predict, radiomica_test_resposta)
 
 ```
 
-
 ## LASSO
 
 Cream una matriu de les variables predictors i un vector amb la resposta
@@ -253,5 +251,5 @@ Finalment, aconseguim els valors dels coeficients
 lasso.coef <- predict(modelo_lasso, type = "coefficients", s = bestlam)
 lasso.coef
 ```
-## Random Forest
 
+## Random Forest
