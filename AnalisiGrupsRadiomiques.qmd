@@ -26,14 +26,34 @@ colorTFG <- rgb(91, 200, 145, maxColorValue = 250)
 A continuació, llegim els csv pertinents:
 
 ```{r}
-radiomica <- read.csv("radiomica_data_processed.csv")
+radiomica <- read.csv("Radiomica Data csv/radiomica_data_processed.csv")
 #str(clinical)
 
-radiomica_train <- read.csv("radiomica_data_processed_train.csv")
+radiomica_train <- read.csv("Radiomica Data csv/radiomica_data_processed_train.csv")
 #str(clinical_train)
 
-radiomica_test <- read.csv("radiomica_data_processed_test.csv")
+radiomica_test <- read.csv("Radiomica Data csv/radiomica_data_processed_test.csv")
 #str(clinical_test)
+```
+
+```{r}
+clinical <- read.csv("Clinical Data csv/clinical_data_processed.csv")
+#str(clinical)
+
+clinical_train <- read.csv("Clinical Data csv/clinical_data_processed_train.csv")
+#str(clinical_train)
+
+clinical_test <- read.csv("Clinical Data csv/clinical_data_processed_test.csv")
+#str(clinical_test)
+```
+
+```{r}
+clinical <- clinical[-89,]
+clinical_test <- clinical_test[-32,]
+
+clinical <- clinical %>%  select(-OS, -TCIA_ID)
+clinical_train <- clinical_train %>%  select(-OS,-TCIA_ID)
+clinical_test <- clinical_test %>%  select(-OS,-TCIA_ID)
 ```
 
 ## Grups de característiques radiòmiques
@@ -41,9 +61,11 @@ radiomica_test <- read.csv("radiomica_data_processed_test.csv")
 Ara hem d'extreure les característiques segons el grup que pertanyi. Utilitzarem la següent funció.
 
 ```{r}
-grupo <- function(prefijo, data) {
+grupo <- function(prefijo, data, data2) {
   df <- data %>%
     select(starts_with(prefijo), OS)
+  
+  df <- cbind(df,data2)
   return(df)
 }
 ```
@@ -51,57 +73,57 @@ grupo <- function(prefijo, data) {
 ### Firstorder
 
 ```{r}
-firstorder <- grupo("original_firstorder", radiomica)
-firstorder_test <- grupo("original_firstorder", radiomica_test)
-firstorder_train <- grupo("original_firstorder", radiomica_train)
+firstorder <- grupo("original_firstorder", radiomica, clinical)
+firstorder_test <- grupo("original_firstorder", radiomica_test, clinical_test)
+firstorder_train <- grupo("original_firstorder", radiomica_train, clinical_train)
 ```
 
 ### Shape
 
 ```{r}
-shape <- grupo("original_shape", radiomica)
-shape_test <- grupo("original_shape", radiomica_test)
-shape_train <- grupo("original_shape", radiomica_train)
+shape <- grupo("original_shape", radiomica, clinical)
+shape_test <- grupo("original_shape", radiomica_test, clinical_test)
+shape_train <- grupo("original_shape", radiomica_train, clinical_train)
 ```
 
 ### Gray Level Co-ocurrence Matrix
 
 ```{r}
-glcm <- grupo("original_glcm", radiomica)
-glcm_test <- grupo("original_glcm", radiomica_test)
-glcm_train <- grupo("original_glcm", radiomica_train)
+glcm <- grupo("original_glcm", radiomica, clinical)
+glcm_test <- grupo("original_glcm", radiomica_test, clinical_test)
+glcm_train <- grupo("original_glcm", radiomica_train, clinical_train)
 ```
 
 ### Gray Level Run Length Matrix
 
 ```{r}
-glrlm <- grupo("original_glrlm", radiomica)
-glrlm_test <- grupo("original_glrlm", radiomica_test)
-glrlm_train <- grupo("original_glrlm", radiomica_train)
+glrlm <- grupo("original_glrlm", radiomica, clinical)
+glrlm_test <- grupo("original_glrlm", radiomica_test, clinical_test)
+glrlm_train <- grupo("original_glrlm", radiomica_train, clinical_train)
 ```
 
 ### Gray Level Size Zone Matrix
 
 ```{r}
-glszm <- grupo("original_glszm", radiomica)
-glszm_test <- grupo("original_glszm", radiomica_test)
-glszm_train <- grupo("original_glszm", radiomica_train)
+glszm <- grupo("original_glszm", radiomica, clinical)
+glszm_test <- grupo("original_glszm", radiomica_test, clinical_test)
+glszm_train <- grupo("original_glszm", radiomica_train, clinical_train)
 ```
 
 ### Neighbouring Gray Tone Difference Matrix
 
 ```{r}
-ngtdm <- grupo("original_ngtdm", radiomica)
-ngtdm_test <- grupo("original_ngtdm", radiomica_test)
-ngtdm_train <- grupo("original_ngtdm", radiomica_train)
+ngtdm <- grupo("original_ngtdm", radiomica, clinical)
+ngtdm_test <- grupo("original_ngtdm", radiomica_test, clinical_test)
+ngtdm_train <- grupo("original_ngtdm", radiomica_train, clinical_train)
 ```
 
 ### Gray Level Dependece Matrix
 
 ```{r}
-gldm <- grupo("original_gldm", radiomica)
-gldm_test <- grupo("original_gldm", radiomica_test)
-gldm_train <- grupo("original_gldm", radiomica_train)
+gldm <- grupo("original_gldm", radiomica, clinical)
+gldm_test <- grupo("original_gldm", radiomica_test, clinical_test)
+gldm_train <- grupo("original_gldm", radiomica_train, clinical_train)
 ```
 
 ## Llistes dels grups
@@ -132,13 +154,13 @@ calcular_metriques <- function(llista_prediccions, llista_test, variable_respost
     
     y_real <- dades_test[[variable_resposta]]
     
-    mse <- mse(y_real, prediccions)
+    mse_valor <- mse(y_real, prediccions)
     
-    r_squared <- r_squared(y_real, prediccions)
+    r_squared_valor <- r_squared(y_real, prediccions)
     
     metriques[[paste0("modelo_", i)]] <- list(
-      mse = mse,
-      r_squared = r_squared
+      mse_valor = mse_valor,
+      r_squared_valor = r_squared_valor
     )
   }
   
