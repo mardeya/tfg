@@ -289,7 +289,7 @@ qq_plot <- ggplot(data.frame(residuals), aes(sample = residuals)) +
 print(qq_plot)
 ```
 
-##  Regressió LASSO
+## Regressió LASSO
 
 Cream una matriu de les variables predictors i un vector amb la resposta
 
@@ -380,7 +380,6 @@ test.err
 
 ```
 
-
 Validació creuada
 
 ```{r}
@@ -405,7 +404,7 @@ r2_rf
 mse_rf <- mse(radiomica_test_resposta,yhat)
 
 mse_rf
-``` 
+```
 
 Finalment, vegem quines han estat les variables més importants a l'hora de crear el noste model.
 
@@ -436,10 +435,10 @@ ggplot(importance_df, aes(x = reorder(Variable, IncNodePurity), y = IncNodePurit
 ## GAM
 
 En aquest apartat entrenarem el model GAM per a intentar trobar un relació no lineal entre els prdictors i la variable resposta.
+
 ```{r}
 importance_df
 ```
-
 
 ```{r}
 gam2 <- gam::gam(OS ~ gam::s(original_shape_SurfaceVolumeRatio) + gam::s(original_shape_SurfaceArea) +
@@ -471,6 +470,7 @@ summary(gam2)
 pred = predict(gam2, newdata = radiomica_colin_test)
 pred
 ```
+
 Calculam les mètriques d'ajustament
 
 ```{r}
@@ -481,4 +481,3 @@ mse_gam <- mse(radiomica_test_resposta, pred)
 mse_gam
 
 ```
-

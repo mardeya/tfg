@@ -88,6 +88,12 @@ r_squared <- function(actual, predicted) {
 }
 ```
 
+Funció per a dur a terme la validació creuada
+
+```{r}
+train_control <- trainControl(method = "cv", number = 5)
+```
+
 ## Regressió lineal
 
 Realitzarem tres regressions lineals, cada una amb un mètode diferent per a afrontar el problema de grans dimensions
@@ -119,7 +125,7 @@ summary(rl_step)
 
 A n'aquest apartat realitzarem un anàlisi de components principals i la posterior regressió.
 
-Ens agafam les cinc primeres dimensions ja que agrupen el 80% de la variança.
+Ens agafam les nou primeres dimensions ja que agrupen el 80% de la variança.
 
 ```{r}
 pcr.regression <- pcr(OS ~., data = clinical_radiomica_train, scale = TRUE, validation = "CV") 
@@ -130,7 +136,7 @@ summary(pcr.regression)
 validationplot(pcr.regression, val.type = "MSEP")
 ```
 
-Elegirem aleshores 6 components
+Elegirem aleshores 9 components
 
 ```{r}
 pcr.fit <- pcr(OS ~., data = clinical_radiomica_train, scale = TRUE, ncomp = 8)
@@ -138,7 +144,7 @@ summary(pcr.fit)
 ```
 
 ```{r}
-pcr.pred <- predict(pcr.fit, clinical_radiomica_test, ncomp = 6)
+pcr.pred <- predict(pcr.fit, clinical_radiomica_test, ncomp = 8)
 pcr.pred[,,]
 ```
 
@@ -166,16 +172,29 @@ ggplot(components_df, aes(x = Component)) +
             vjust = -0.5, size = 3) +
   scale_x_continuous(breaks = seq_along(explained_variance)) +
   labs(title = "Scree plot",
-       x = "Componentes Principales",
-       y = "Varianza Explicada (%)") +
+       x = "Components Principals",
+       y = "Variança Explicada (%)") +
   theme_minimal()
 ```
 
 ### Anàlisi de la col·linealitat
 
+A continuació realitzam un anàlisi de col·linealitat
+
+```{r}
+clinical_data_quant_train <- clinical_radiomica_train %>%  select(AFP, age)
+conjunta_quant_train <- cbind(clinical_data_quant_train, radiomica_train)
+
+conjunta_quant_train <- conjunta_quant_train %>%  select(-Patient)
+```
+
+```{r}
+matriu_corr <- cor(conjunta_quant_train)
+```
+
 ```{r}
 
-corr_matrix <- cor(radiomica_data_quant)
+corr_matrix <- cor(conjunta_quant_train)
 
 high_corr <- which(abs(corr_matrix) > 0.75 & upper.tri(corr_matrix), arr.ind = TRUE)
 
@@ -184,11 +203,11 @@ var_counts <- table(c(rownames(corr_matrix)[high_corr[,1]], colnames(corr_matrix
 for (i in 1:nrow(high_corr)) {
   var1 <- rownames(corr_matrix)[high_corr[i, 1]]
   var2 <- colnames(corr_matrix)[high_corr[i, 2]]
-  if (var1 %in% colnames(radiomica_data_quant) && var2 %in% colnames(radiomica_data_quant)) {
+  if (var1 %in% colnames(conjunta_quant_train) && var2 %in% colnames(conjunta_quant_train)) {
     if (var_counts[var1] <= var_counts[var2]) {
-      radiomica_data_quant <- radiomica_data_quant[, !colnames(radiomica_data_quant) %in% var1]
+      conjunta_quant_train <- conjunta_quant_train[, !colnames(conjunta_quant_train) %in% var1]
     } else {
-      radiomica_data_quant <- radiomica_data_quant[, !colnames(radiomica_data_quant) %in% var2]
+      conjunta_quant_train <- conjunta_quant_train[, !colnames(conjunta_quant_train) %in% var2]
     }
   }
 }
@@ -221,35 +240,193 @@ tabla_predict <- data.frame(radiomica_test_id, predict, radiomica_test_resposta)
 Cream una matriu de les variables predictors i un vector amb la resposta
 
 ```{r}
-resposta <-clinical_radiomica$OS
+conjunta_quant_train <- conjunta_quant_train %>%  select(-age, -AFP)
+conjunta <- cbind(clinical, radiomica[,colnames(conjunta_quant_train)])
 
-matriz_pred <- clinical_radiomica %>% 
-  select(-Patient, -OS, - Patient) %>% 
+```
+
+```{r}
+resposta <-conjunta$OS
+
+matriz_pred <- conjunta %>% 
+  select( -OS) %>% 
   as.matrix()
 
 ```
 
 ```{r}
 set.seed(2024)
-train = sample(1:nrow(clinical_radiomica), 70)
+train = sample(1:nrow(conjunta), 70)
 modelo_lasso <- glmnet(matriz_pred[train, ], resposta[train], alpha = 1)
 plot(modelo_lasso, xvar = "lambda", xlab = expression(log(lambda)), ylab = "Coeficients")
 plot(modelo_lasso, xvar = "dev")
 ```
 
+Predicció segons el valor de lambda
+
 ```{r}
 cv.out <- cv.glmnet(matriz_pred[train, ], resposta[train], alpha = 1)
-plot(cv.out, main = expression("Error quadràtic mitjà - Paràmetre" ~ lambda))
+plot(cv.out)
 bestlam <- cv.out$lambda.min
-lasso.pred <- predict(modelo_lasso, s=bestlam, newx= matriz_pred[-train, ])
+lasso.pred <- predict(modelo_lasso, s=15, newx= matriz_pred[-train, ])
 #mean((lasso.pred-resposta[-train])^2)
 ```
 
 Finalment, aconseguim els valors dels coeficients
 
 ```{r}
-lasso.coef <- predict(modelo_lasso, type = "coefficients", s = bestlam)
+lasso.coef <- predict(modelo_lasso, type = "coefficients", s = 15)
 lasso.coef
 ```
 
+Calculam les mètriques d'ajustament
+
+```{r}
+r2_rf <- r_squared(resposta[-train], lasso.pred)
+r2_rf
+
+mse_rf <- mse(resposta[-train], lasso.pred)
+
+mse_rf
+ 
+```
+
+Validació creuada
+
+```{r}
+lasso_model <- train(matriz_pred[train,], resposta[train],
+                     method = "glmnet",
+                     trControl = train_control,
+                     tuneGrid = expand.grid(alpha = 1, lambda = bestlam)
+)
+print(lasso_model)
+```
+
 ## Random Forest
+
+En aquest apartat, entrenarem el model de Random Forest al nostre dataset.
+
+```{r}
+set.seed(2024)
+train = sample(1:nrow(conjunta), 70)
+rf.conjunta_data <- randomForest(OS ~. - TCIA_ID, data = conjunta, subset = train, mtry = 1, trees = 50)
+rf.conjunta_data
+yhat <- predict(rf.conjunta_data, newdata = conjunta[-train, ], trees = 50)
+clinical.test <- conjunta[-train,]$OS
+#mean((yhat - clinical.test)^2 )
+#yhat
+
+plot(rf.conjunta_data)
+```
+
+Vegem quina mètrica seleccionar per a entrenar el nostre model.
+
+```{r}
+oob.err = double(13)
+test.err = double(13)
+
+for (mtry in 1:15){
+  fit <- randomForest(OS ~. - TCIA_ID, data = conjunta, subset = train, mtry = mtry)
+  oob.err[mtry] = fit$mse[600]
+  pred =  predict(fit, newdata = conjunta[-train, ])
+  test.err[mtry] = with(conjunta[-train,], mean((OS-pred)^2))
+}
+
+```
+
+```{r}
+plot(1:15, test.err, type = "b", pch = 19, col = colorTFG, 
+     xlab = "Mètrica", ylab = "MSE", main = "MSE vs. mètrica",
+     ylim = c(min(test.err) - 0.5, max(test.err) + 0.5))
+lines(1:15, test.err, col = colorTFG, type = "b", pch = 19)
+grid()  # Afegir graella de fons
+legend("topright", legend = "MSE", col = colorTFG, pch = 19)
+
+# Mostrar el punt amb l'error mínim
+min_test_err <- min(test.err)
+min_mtry <- which(test.err == min_test_err)
+points(min_mtry, min_test_err, col = "red", pch = 19)
+text(min_mtry + 0.5, min_test_err, paste("Mínim MSE"), pos = 4, col = "red")
+```
+
+Validació creuada
+
+```{r}
+#rf_model <- train(matriz_pred[train,], resposta[train],
+                  #method = "rf",
+                  #trControl = train_control,
+                  #metric = "Rsquared")
+#print(rf_model)
+```
+
+Calculam les mètriques de l'ajustament
+
+```{r}
+# Calculam R^2 de les dades test
+
+r2_rf <- r_squared(resposta[-train], yhat)
+r2_rf
+
+mse_rf <- mse(resposta[-train],yhat)
+
+mse_rf
+```
+
+Finalment, vegem quines han estat les variables més importants a l'hora de crear el noste model.
+
+```{r}
+importance(rf.conjunta_data)
+```
+
+```{r}
+importance_df <- as.data.frame(importance(rf.conjunta_data))
+
+# Afegir noms de columnes per claredat
+colnames(importance_df) <- c("IncNodePurity")
+
+# Ordenar les variables per importància decreixent
+importance_df$Variable <- rownames(importance_df)
+importance_df <- importance_df[order(importance_df$IncNodePurity, decreasing = TRUE), ]
+
+# Gràfica de barres de la importància de les variables
+ggplot(importance_df, aes(x = reorder(Variable, IncNodePurity), y = IncNodePurity), col = colorTFG) +
+  geom_bar(stat = "identity", fill = colorTFG) +
+  coord_flip() +
+  xlab("") +
+  ylab("Increment de la Puresa del Node (IncNodePurity)") +
+  ggtitle("Importància de les Variables en el Model de Random Forest") + 
+  theme_minimal()
+```
+
+## GAM
+
+En aquest apartat entrenarem el model GAM per a intentar trobar un relació no lineal entre els predictors i la variable resposta.
+
+```{r}
+
+conjunta_train <- conjunta[train,]
+
+gam2 <- gam::gam(OS ~ gam::s(age) + gam::s(AFP)+Alcohol + gam::s(original_shape_SurfaceVolumeRatio) + gam::s(original_shape_SurfaceArea) +
+                   gam::s(original_glcm_SumAverage) + gam::s(original_glszm_SmallAreaEmphasis) + 
+                    gam::s(original_firstorder_MeanAbsoluteDeviation) + gam::s(original_glrlm_GrayLevelNonUniformity), data = conjunta_train )
+#summary(gam2)
+plot(gam2, se = TRUE, col=colorTFG)
+```
+
+```{r}
+summary(gam2)
+```
+
+```{r}
+pred = predict(gam2, newdata = conjunta[-train,])
+pred
+```
+
+```{r}
+r2_gam <- r_squared(resposta[-train], pred)
+r2_gam
+
+mse_gam <- mse(resposta[-train], pred)
+mse_gam
+
+```
