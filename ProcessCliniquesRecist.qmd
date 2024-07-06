@@ -1,0 +1,156 @@
+---
+title: "Analisi Dades Cliniques Classificació"
+format: html
+editor: visual
+---
+
+## Paquets necessaris
+
+En primer lloc, carregarem a continuació els paquets necessaris per dur a terme els diferents models o les diverses funcions de R que necessitarem.
+
+```{r}
+library(dplyr)
+library(readxl)
+```
+
+Aquest el color predeterminat que utilitzarem per a colorejar els gràfics que adjuntarem a la memòria del treball
+
+```{r}
+colorTFG <- rgb(91, 200, 145, maxColorValue = 250)
+
+```
+
+## Importar el dataset i processament
+
+Primer de tot importam el dataset de les dades clíniques que hem descarregat
+
+```{r}
+clinical_data <- read_excel("Clinical Data csv/clinical_data.xlsx")
+```
+
+Tenim un total de 105 observacions (pacients) i 57 variables. D'aquestes variables ens interessen aquelles que descriuen l'estat clínic del pacient o aspectes biològics del malalt. Les seleccionam, a continuació;
+
+```{r}
+clinical_data_p <- clinical_data %>% 
+  select(TCIA_ID, hepatitis, age, Sex, Smoking, Alcohol,
+         fhx_can, fhx_livc, Diabetes, `Personal history of cancer`, Evidence_of_cirh, Tr_Size, tumor_nodul, `Vascular invasion`, Metastasis, Lymphnodes,`Portal Vein Thrombosis`, T_involvment, AFP,`1_RECIST`)
+```
+
+Hem eliminat principalment les variables que eren estratificacions i les classificacions dels pacients segons diverses entitats. Ens hem quedat ara amb 20 variables. D'aquestes eliminam $Tr\_Size$ ja que presenta valors NA.
+
+```{r}
+clinical_data_p <- clinical_data_p %>% 
+  select(-Tr_Size)
+```
+
+Vegem quines són les variables numèriques i quines són les qualitatives. Tenim que $TCIA\_ID$ és la clau primària i la nostra variable resposta, Y, és $OS$
+
+```{r}
+attach(clinical_data_p)
+
+clinical_data_p_numeriques <- clinical_data_p %>% 
+  select(age, AFP)
+clinical_data_p_qual <- clinical_data_p %>% 
+  select( hepatitis, Sex, Smoking, Alcohol,
+         fhx_can, fhx_livc, Diabetes, `Personal history of cancer`, Evidence_of_cirh, 
+         , tumor_nodul, `Vascular invasion`, Metastasis, Lymphnodes,
+         `Portal Vein Thrombosis`, T_involvment)
+```
+
+Calculem la correlació entre les variables numèriques. Aquesta és petita per tant no tenim cap problema.
+
+```{r}
+cor(age, AFP)
+```
+
+Vegem ara un diagrama de barres per a cada variable qualitativa.
+
+```{r}
+par(mfrow = c(1, 3))  # Dividir el área de la gráfica en múltiples paneles
+
+for (i in seq_along(names(clinical_data_p_qual))) {
+  counts <- table(clinical_data_p_qual[[i]])
+  if (i == 1) {
+    barplot(counts, main = names(clinical_data_p_qual)[i], col = colorTFG, las = 2)
+  } else {
+    barplot(counts, main = names(clinical_data_p_qual)[i], col = colorTFG)
+  }
+}
+```
+
+Eliminam les variables $fhx\_livc$, $Metastasis$ i $Lymphnodes$ perquè tenim poques observacions d'un dels seus nivells.
+
+```{r}
+clinical_data_p <- clinical_data_p %>% 
+  select(-fhx_livc, -Metastasis, -Lymphnodes)
+```
+
+Ens quedam ara amb 16 variables.
+
+De les variables $T-involvment$ i $tumor\_nodul$, com presnten un ordre en els seus factors las codificam de manera ordinal
+
+```{r}
+clinical_data_p$T_involvment <- as.factor(clinical_data_p$T_involvment)
+levels(clinical_data_p$T_involvment) <- c(0,1)
+clinical_data_p$tumor_nodul <- as.factor(clinical_data_p$tumor_nodul)
+levels(clinical_data_p$tumor_nodul) <- c(1,0)
+```
+
+Finalment, a la variable $hepatitis$ emplearem la codificació one-hot ja que presente factors sense cap tipus d'ordre.
+
+```{r}
+onehot <- model.matrix(~ . - 1, data = clinical_data_p[c("hepatitis")])
+clinical_data_p <- cbind(clinical_data_p, onehot)
+clinical_data_p <- clinical_data_p %>% 
+  select(-hepatitis, -`hepatitisNo virus`, - `hepatitisHCV and HBV`)
+
+
+names(clinical_data_p)[names(clinical_data_p) == "hepatitisHBV only"] <- "hepatitis_HBV"
+names(clinical_data_p)[names(clinical_data_p) == "hepatitisHCV only"] <- "hepatitis_HCV"
+names(clinical_data_p)[names(clinical_data_p) == "Personal history of cancer"] <- "Personal_history_cancer"
+names(clinical_data_p)[names(clinical_data_p) == "Vascular invasion"] <- "Vascular_Invasion"
+names(clinical_data_p)[names(clinical_data_p) == "Portal Vein Thrombosis"] <- "Portal_Vein_Thrombosis"
+names(clinical_data_p)[names(clinical_data_p) == "1_RECIST"] <- "Recist"
+```
+
+Codificam amb zeros i uns la variable Recist
+
+```{r}
+clinical_data_p$Recist <- factor(clinical_data_p$Recist)
+clinical_data_p$Recist <- recode(clinical_data_p$Recist, `1` = 0, `2` = 0, `3` = 1, `4` = 1)
+table(clinical_data_p$Recist)
+clinical_data_p <- na.omit(clinical_data_p, cols = "Recist")
+
+```
+
+Una vegada realitzat tots els canvis, anem a guardar-ho en un .csv
+
+```{r}
+nombre_archivo <- "Clinical Resist csv/clinical_data_processed.csv"
+
+write.csv(clinical_data_p, file = nombre_archivo, row.names = FALSE)
+```
+
+## Data train y data test
+
+A continuació, dividirem el nostre conjunt de dades clíniques en dos subconjunts: un d'entrenament i l'altra de test. Utilizarem la "semilla" 2024.
+
+```{r}
+set.seed(2024)
+train <- sample(1:nrow(clinical_data_p), 70)
+test <- (-train)
+clinical_data_p_train <- clinical_data_p[train,]
+clinical_data_p_test <- clinical_data_p[test,]
+```
+
+Finalment, guardam aquestes dues agrupacions de dades a un arxiu csv.
+
+```{r}
+nombre_archivo <- "Clinical Resist csv/clinical_data_processed_test.csv"
+
+write.csv(clinical_data_p_test, file = nombre_archivo, row.names = FALSE)
+
+nombre_archivo <- "Clinical Resist csv/clinical_data_processed_train.csv"
+
+write.csv(clinical_data_p_train, file = nombre_archivo, row.names = FALSE)
+```

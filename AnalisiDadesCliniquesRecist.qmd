@@ -1,0 +1,175 @@
+---
+title: "AnalisiCliniquesRecist"
+format: html
+editor: visual
+---
+
+
+```{r}
+colorTFG <- rgb(91, 200, 145, maxColorValue = 250)
+```
+
+## Paquets necessaris
+
+A continuació, carregarem els paquets necessaris per a dur a terme l'estudi de les dades clíniques
+
+```{r}
+library(tidyverse)
+library(glmnet)
+library(dplyr)
+library(randomForest)
+library(splines)
+library(caret)
+library(mgcv)
+library(pROC)
+library(e1071)
+```
+
+## Lectura de la base de dades
+
+Primer de tot llegim els csv generats durant el processament de les dades clíniques.
+
+```{r}
+clinical <- read.csv("Clinical Resist csv/clinical_data_processed.csv")
+#str(clinical)
+
+clinical_train <- read.csv("Clinical Resist csv/clinical_data_processed_train.csv")
+#str(clinical_train)
+
+clinical_test <- read.csv("Clinical Resist csv/clinical_data_processed_test.csv")
+#str(clinical_test)
+
+
+clinical <- clinical %>%  select(-TCIA_ID)
+clinical_train <- clinical_train %>%  select(-TCIA_ID)
+clinical_test <- clinical_test %>%  select(-TCIA_ID)
+```
+
+
+## Funcions útils
+
+Funció que calcula el MSE:
+
+```{r}
+mse <- function(real, prediccio) {
+  return(mean((real - prediccio)^2))
+}
+```
+
+Funció que calcula el $R^2$:
+
+```{r}
+r_squared <- function(actual, predicted) {
+  
+  ss_residual <- sum((actual - predicted)^2)
+  ss_total <- sum((actual - mean(actual))^2)
+  
+  return(1 - (ss_residual / ss_total))
+}
+```
+
+Funció que calcula el $R^2$ ajustat:
+
+```{r}
+adjusted_r2 <- function(r2, n, p) {
+  adj_r2 <- 1 - ((1 - r2) * (n - 1) / (n - p - 1))
+  return(adj_r2)
+}
+# n nombre d'observacions, p nombre de variables utilitzades
+```
+
+Funció per a dur a terme la validació creuada
+
+```{r}
+train_control <- trainControl(method = "cv", number = 5)
+```
+
+## Regressió logística
+
+Entrenarem la regressió logística
+
+```{r}
+model <- glm(Recist ~ ., data = clinical_train, family = binomial)
+summary(model)
+```
+
+```{r}
+predictions <- predict(model, newdata = clinical_test, type = "response")
+predicted_labels <- ifelse(predictions > 0.5, 1, 0) %>%  as.vector()
+
+
+confusion_matrix <- table(clinical_test$Recist, predicted_labels)
+
+print(confusion_matrix)
+```
+
+```{r}
+roc_curve <- roc(clinical_test$Recist, predicted_labels)
+auc_value <- auc(roc_curve)
+print(paste("AUC:", auc_value))
+plot(roc_curve, main = "Corba ROC", col = colorTFG)
+```
+
+## Random Forest
+
+En aquest apartat, entrenarem el model de Random Forest a les nostres dades clíniques.
+
+```{r}
+clinical_train$Recist <- as.factor(clinical_train$Recist)
+clinical_test$Recist <- as.factor(clinical_test$Recist)
+```
+
+
+
+```{r}
+rf_model <- randomForest(Recist ~ ., data = clinical_train, ntree = 500, mtry = 6, importance = TRUE)
+```
+
+```{r}
+rf_predictions <- predict(rf_model, newdata = clinical_test, type = "prob")[, 2]
+
+# Evaluar el modelo con la métrica AUC
+roc_curve <- roc(clinical_test$Recist, rf_predictions)
+auc_value <- auc(roc_curve)
+
+# Imprimir el valor de AUC
+print(paste("AUC:", auc_value))
+
+# Graficar la curva ROC
+plot(roc_curve, main = "Corba ROC", col = colorTFG)
+```
+
+## Naive Bayes
+
+
+```{r}
+nb_model <- naiveBayes(Recist ~ ., data = clinical_train)
+
+# Realitzar prediccions sobre el conjunt de test
+nb_predictions_prob <- predict(nb_model, clinical_test, type = "raw")
+
+# Suposant que la variable objectiu 'Recist' és binària i que la primera columna de nb_predictions_prob
+# conté les probabilitats per a la classe positiva (p.ex., "1")
+nb_predictions <- ifelse(nb_predictions_prob[, 2] > 0.5, "1", "0")
+
+# Crear una taula de confusió
+conf_matrix <- table(Predicted = nb_predictions, Actual = clinical_test$Recist)
+
+# Mostrar la taula de confusió
+print(conf_matrix)
+
+# Calcular l'accuràcia del model
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+print(paste("Accuracy: ", accuracy))
+
+# Calcular la corba ROC i l'AUC
+roc_curve <- roc(clinical_test$Recist, as.numeric(nb_predictions_prob[, 2]))
+auc_value <- auc(roc_curve)
+
+# Mostrar l'AUC
+print(paste("AUC: ", auc_value))
+
+# Plot de la corba ROC
+plot(roc_curve, main = " Corba ROC", col= colorTFG)
+```
+

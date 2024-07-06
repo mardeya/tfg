@@ -1,0 +1,206 @@
+---
+title: "Processament Dades Cliniques Radiomiques Recist"
+format: html
+editor: visual
+---
+
+
+## Paquets necessaris
+
+Primer de tot carregam tots el paquets necessaris i carregam el color propi de la memòria del TFG.
+
+```{r}
+library(glmnet)
+library(dplyr)
+library(readxl)
+library(ggplot2)
+library(factoextra)
+library(pls)
+library(randomForest)
+library(caret)
+
+colorTFG <- rgb(91, 200, 145, maxColorValue = 250)
+```
+
+A continuació, llegim els csv necesaris:
+
+```{r}
+radiomica <- read.csv("Radiomica Data csv/radiomica_data_processed.csv")
+#str(clinical)
+
+radiomica_train <- read.csv("Radiomica Data csv/radiomica_data_processed_train.csv")
+#str(clinical_train)
+
+radiomica_test <- read.csv("Radiomica Data csv/radiomica_data_processed_test.csv")
+#str(clinical_test)
+```
+
+```{r}
+clinical <- read.csv("Clinical Resist csv/clinical_data_processed.csv")
+#str(clinical)
+
+clinical_train <- read.csv("Clinical Resist csv/clinical_data_processed_train.csv")
+#str(clinical_train)
+
+clinical_test <- read.csv("Clinical Resist csv/clinical_data_processed_test.csv")
+#str(clinical_test)
+```
+
+
+```{r}
+radiomica <- radiomica %>%
+  rename(TCIA_ID = Patient)
+
+radiomica_test <- radiomica_test %>% 
+  rename(TCIA_ID = Patient)
+
+radiomica_train <- radiomica_train %>% 
+  rename(TCIA_ID = Patient)
+```
+
+
+```{r}
+conjunta <- right_join(clinical, radiomica, by = "TCIA_ID")
+
+conjunt_test <- right_join(clinical_test, radiomica_test, by = "TCIA_ID")
+
+conjunta_train <- right_join(clinical_train, radiomica_train, by = "TCIA_ID")
+```
+
+
+```{r}
+conjunta_train$Recist <- as.factor(conjunta_train$Recist)
+conjunt_test$Recist <- as.factor(conjunt_test$Recist)
+```
+
+```{r}
+conjunta <- conjunta %>%  select(-TCIA_ID, -OS)
+conjunta_train <- conjunta_train %>%  select(-TCIA_ID, -OS)
+conjunta_test <- conjunt_test %>%  select(-TCIA_ID, -OS)
+```
+
+
+## Funcions útils
+
+Funció que calcula el MSE:
+
+```{r}
+mse <- function(real, prediccio) {
+  return(mean((real - prediccio)^2))
+}
+```
+
+Funció que calcula el $R^2$:
+
+```{r}
+r_squared <- function(actual, predicted) {
+  
+  ss_residual <- sum((actual - predicted)^2)
+  ss_total <- sum((actual - mean(actual))^2)
+  
+  return(1 - (ss_residual / ss_total))
+}
+```
+
+Funció que calcula el $R^2$ ajustat:
+
+```{r}
+adjusted_r2 <- function(r2, n, p) {
+  adj_r2 <- 1 - ((1 - r2) * (n - 1) / (n - p - 1))
+  return(adj_r2)
+}
+# n nombre d'observacions, p nombre de variables utilitzades
+```
+
+Funció per a dur a terme la validació creuada
+
+```{r}
+train_control <- trainControl(method = "cv", number = 5)
+```
+
+## Regressió logística
+
+Entrenarem la regressió logística
+
+```{r}
+model <- glm(Recist ~ ., data = conjunta_train, family = binomial)
+summary(model)
+```
+
+```{r}
+predictions <- predict(model, newdata = conjunta_test, type = "response")
+predicted_labels <- ifelse(predictions > 0.5, 1, 0) %>%  as.vector()
+
+
+confusion_matrix <- table(conjunta_test$Recist, predicted_labels)
+
+print(confusion_matrix)
+```
+
+```{r}
+roc_curve <- roc(conjunta_test$Recist, predicted_labels)
+auc_value <- auc(roc_curve)
+print(paste("AUC:", auc_value))
+plot(roc_curve, main = "Corba ROC", col = colorTFG)
+```
+
+## Random Forest
+
+En aquest apartat, entrenarem el model de Random Forest a les nostres dades clíniques.
+
+
+
+
+```{r}
+rf_model <- randomForest(Recist ~ ., data = conjunta_train, ntree = 500, mtry = 6, importance = TRUE)
+```
+
+```{r}
+rf_predictions <- predict(rf_model, newdata = clinical_test, type = "prob")[, 2]
+
+# Evaluar el modelo con la métrica AUC
+roc_curve <- roc(clinical_test$Recist, rf_predictions)
+auc_value <- auc(roc_curve)
+
+# Imprimir el valor de AUC
+print(paste("AUC:", auc_value))
+
+# Graficar la curva ROC
+plot(roc_curve, main = "Corba ROC", col = colorTFG)
+```
+
+## Naive Bayes
+
+
+```{r}
+nb_model <- naiveBayes(Recist ~ ., data = conjunta_train)
+
+# Realitzar prediccions sobre el conjunt de test
+nb_predictions_prob <- predict(nb_model, conjunta_test, type = "raw")
+
+# Suposant que la variable objectiu 'Recist' és binària i que la primera columna de nb_predictions_prob
+# conté les probabilitats per a la classe positiva (p.ex., "1")
+nb_predictions <- ifelse(nb_predictions_prob[, 2] > 0.5, "1", "0")
+
+# Crear una taula de confusió
+conf_matrix <- table(Predicted = nb_predictions, Actual = conjunta_test$Recist)
+
+# Mostrar la taula de confusió
+print(conf_matrix)
+
+# Calcular l'accuràcia del model
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+print(paste("Accuracy: ", accuracy))
+
+# Calcular la corba ROC i l'AUC
+roc_curve <- roc(conjunta_test$Recist, as.numeric(nb_predictions_prob[, 2]))
+auc_value <- auc(roc_curve)
+
+# Mostrar l'AUC
+print(paste("AUC: ", auc_value))
+
+# Plot de la corba ROC
+plot(roc_curve, main = " Corba ROC", col= colorTFG)
+```
+
+
