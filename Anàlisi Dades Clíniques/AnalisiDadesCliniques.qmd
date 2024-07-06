@@ -59,7 +59,7 @@ r_squared <- function(actual, predicted) {
 }
 ```
 
-Funció que calcula el \$R\^2\$ ajustat:
+Funció que calcula el $R^2$ ajustat:
 
 ```{r}
 adjusted_r2 <- function(r2, n, p) {
@@ -99,8 +99,13 @@ Per tant, la predicció és $124.9$ setmanes.
 r2_base <- r_squared(clinical_test_resposta, prediccio)
 r2_base
 
+adjusted_r2(r2_base, 35, 0)
+
 mse_base <- mse(clinical_test_resposta, prediccio)
 mse_base
+
+mse_base_train <- mse(clinical_train_resposta, prediccio)
+mse_base_train
 ```
 
 ## Regressió lineal
@@ -156,6 +161,9 @@ r2_lineal
 
 mse_lineal <- mse(clinical_test_resposta, predict)
 mse_lineal
+
+predict_train <-  predict(rl, newdata = clinical_train)
+mse_lineal_train- mse(clinical_train_resposta, predict_train) 
 ```
 
 Finalment, observem la distribució dels residus.
@@ -246,6 +254,10 @@ r2_lasso
 
 mse_lasso <- mse(clinical_test_resposta, lasso.pred)
 mse_lasso
+
+lasso.pred_train <- predict(modelo_lasso, s=5, newx= matriz_pred[train, ])
+mse_lasso_train <- mse(clinical_train_resposta, lasso.pred_train)
+mse_lasso_train
 
 adjusted_r2_lasso <- adjusted_r2(r2_lasso, 35, 11)
 adjusted_r2_lasso
@@ -344,6 +356,11 @@ r2_rf
 mse_rf <- mse(clinical_test_resposta,yhat)
 
 mse_rf
+
+yhat_train <- predict(rf.clinical_data, newdata = clinical[train, ], trees = 50)
+
+mse_rf_train <- mse(clinical_train_resposta, yhat_train )
+mse_rf_train
 ```
 
 Finalment, vegem quines han estat les variables més importants a l'hora de crear el noste model.
@@ -377,7 +394,7 @@ ggplot(importance_df, aes(x = reorder(Variable, IncNodePurity), y = IncNodePurit
 En aquest apartat entrenarem el model GAM per a intentar trobar un relació no lineal entre els prdictors i la variable resposta.
 
 ```{r}
-gam2 <- gam::gam(OS ~ gam::s(age) + gam::s(AFP)+ Diabetes +Alcohol + Sex + Smoking + T_involvment + Evidence_of_cirh + hepatitis_HCV + hepatitis_HBV + Portal_Vein_Thrombosis + Vascular_Invasion + tumor_nodul + Personal_history_cancer + fhx_can, data = clinical_train)
+gam2 <- gam::gam(OS ~ ns(age) + ns(AFP)+ Diabetes +Alcohol + Sex + Smoking + T_involvment + Evidence_of_cirh + hepatitis_HCV + hepatitis_HBV + Portal_Vein_Thrombosis + Vascular_Invasion + tumor_nodul + Personal_history_cancer + fhx_can, data = clinical_train)
 #summary(gam2)
 plot(gam2, se = TRUE, col=colorTFG)
 ```
@@ -400,6 +417,8 @@ summary(gam2)
 ```{r}
 pred = predict(gam2, newdata = clinical_test)
 pred
+
+pred_train = predict(gam2, newdata = clinical_train)
 ```
 
 ```{r}
@@ -408,5 +427,8 @@ r2_gam
 
 mse_gam <- mse(clinical_test_resposta, pred)
 mse_gam
+
+mse_gam_tr <- mse(clinical_train_resposta, pred_train)
+mse_gam_tr
 
 ```
