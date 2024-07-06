@@ -4,7 +4,6 @@ format: html
 editor: visual
 ---
 
-
 ## Paquets necessaris
 
 Primer de tot carregam tots el paquets necessaris i carregam el color propi de la memòria del TFG.
@@ -25,27 +24,26 @@ colorTFG <- rgb(91, 200, 145, maxColorValue = 250)
 A continuació, llegim els csv necesaris:
 
 ```{r}
-radiomica <- read.csv("Radiomica Data csv/radiomica_data_processed.csv")
+radiomica <- read.csv("../Anàlisi Dades Radiòmiques/Radiomica Data csv/radiomica_data_processed.csv")
 #str(clinical)
 
-radiomica_train <- read.csv("Radiomica Data csv/radiomica_data_processed_train.csv")
+radiomica_train <- read.csv("../Anàlisi Dades Radiòmiques/Radiomica Data csv/radiomica_data_processed_train.csv")
 #str(clinical_train)
 
-radiomica_test <- read.csv("Radiomica Data csv/radiomica_data_processed_test.csv")
+radiomica_test <- read.csv("../Anàlisi Dades Radiòmiques/Radiomica Data csv/radiomica_data_processed_test.csv")
 #str(clinical_test)
 ```
 
 ```{r}
-clinical <- read.csv("Clinical Resist csv/clinical_data_processed.csv")
+clinical <- read.csv("Recist Data csv/clinical_data_processed.csv")
 #str(clinical)
 
-clinical_train <- read.csv("Clinical Resist csv/clinical_data_processed_train.csv")
+clinical_train <- read.csv("Recist Data csv/clinical_data_processed_train.csv")
 #str(clinical_train)
 
-clinical_test <- read.csv("Clinical Resist csv/clinical_data_processed_test.csv")
+clinical_test <- read.csv("Recist Data csv/clinical_data_processed_test.csv")
 #str(clinical_test)
 ```
-
 
 ```{r}
 radiomica <- radiomica %>%
@@ -58,7 +56,6 @@ radiomica_train <- radiomica_train %>%
   rename(TCIA_ID = Patient)
 ```
 
-
 ```{r}
 conjunta <- right_join(clinical, radiomica, by = "TCIA_ID")
 
@@ -66,7 +63,6 @@ conjunt_test <- right_join(clinical_test, radiomica_test, by = "TCIA_ID")
 
 conjunta_train <- right_join(clinical_train, radiomica_train, by = "TCIA_ID")
 ```
-
 
 ```{r}
 conjunta_train$Recist <- as.factor(conjunta_train$Recist)
@@ -78,7 +74,6 @@ conjunta <- conjunta %>%  select(-TCIA_ID, -OS)
 conjunta_train <- conjunta_train %>%  select(-TCIA_ID, -OS)
 conjunta_test <- conjunt_test %>%  select(-TCIA_ID, -OS)
 ```
-
 
 ## Funcions útils
 
@@ -148,9 +143,6 @@ plot(roc_curve, main = "Corba ROC", col = colorTFG)
 
 En aquest apartat, entrenarem el model de Random Forest a les nostres dades clíniques.
 
-
-
-
 ```{r}
 rf_model <- randomForest(Recist ~ ., data = conjunta_train, ntree = 500, mtry = 6, importance = TRUE)
 ```
@@ -170,7 +162,6 @@ plot(roc_curve, main = "Corba ROC", col = colorTFG)
 ```
 
 ## Naive Bayes
-
 
 ```{r}
 nb_model <- naiveBayes(Recist ~ ., data = conjunta_train)
@@ -202,5 +193,3 @@ print(paste("AUC: ", auc_value))
 # Plot de la corba ROC
 plot(roc_curve, main = " Corba ROC", col= colorTFG)
 ```
-
-
