@@ -25,7 +25,7 @@ colorTFG <- rgb(91, 200, 145, maxColorValue = 250)
 Primer de tot importam el dataset de les dades clíniques que hem descarregat
 
 ```{r}
-clinical_data <- read_excel("Clinical Data csv/clinical_data.xlsx")
+clinical_data <- read_excel("../Anàlisi Dades Clíniques/Clinical Data csv/clinical_data.xlsx")
 ```
 
 Tenim un total de 105 observacions (pacients) i 57 variables. D'aquestes variables ens interessen aquelles que descriuen l'estat clínic del pacient o aspectes biològics del malalt. Les seleccionam, a continuació;
@@ -126,7 +126,7 @@ clinical_data_p <- na.omit(clinical_data_p, cols = "Recist")
 Una vegada realitzat tots els canvis, anem a guardar-ho en un .csv
 
 ```{r}
-nombre_archivo <- "Clinical Resist csv/clinical_data_processed.csv"
+nombre_archivo <- "Recist Data csv/clinical_data_processed.csv"
 
 write.csv(clinical_data_p, file = nombre_archivo, row.names = FALSE)
 ```
@@ -141,16 +141,19 @@ train <- sample(1:nrow(clinical_data_p), 70)
 test <- (-train)
 clinical_data_p_train <- clinical_data_p[train,]
 clinical_data_p_test <- clinical_data_p[test,]
+
+clinical_data_p_train <- na.omit(clinical_data_p_train, cols = "Recist")
+clinical_data_p_test <- na.omit(clinical_data_p_test, cols = "Recist")
 ```
 
 Finalment, guardam aquestes dues agrupacions de dades a un arxiu csv.
 
 ```{r}
-nombre_archivo <- "Clinical Resist csv/clinical_data_processed_test.csv"
+nombre_archivo <- "Recist Data csv/clinical_data_processed_test.csv"
 
 write.csv(clinical_data_p_test, file = nombre_archivo, row.names = FALSE)
 
-nombre_archivo <- "Clinical Resist csv/clinical_data_processed_train.csv"
+nombre_archivo <- "Recist Data csv/clinical_data_processed_train.csv"
 
 write.csv(clinical_data_p_train, file = nombre_archivo, row.names = FALSE)
 ```

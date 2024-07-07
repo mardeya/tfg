@@ -57,11 +57,17 @@ radiomica_train <- radiomica_train %>%
 ```
 
 ```{r}
-conjunta <- right_join(clinical, radiomica, by = "TCIA_ID")
+conjunta <- left_join(radiomica, clinical, by = "TCIA_ID")
 
-conjunt_test <- right_join(clinical_test, radiomica_test, by = "TCIA_ID")
+conjunt_test <- right_join( radiomica_test, clinical_test, by = "TCIA_ID")
 
-conjunta_train <- right_join(clinical_train, radiomica_train, by = "TCIA_ID")
+conjunta_train <- right_join(radiomica_train, clinical_train, by = "TCIA_ID")
+```
+
+```{r}
+conjunta <- na.omit(conjunta)
+conjunt_test <- na.omit(conjunt_test)
+conjunta_train <- na.omit(conjunta_train)  
 ```
 
 ```{r}
@@ -73,6 +79,12 @@ conjunt_test$Recist <- as.factor(conjunt_test$Recist)
 conjunta <- conjunta %>%  select(-TCIA_ID, -OS)
 conjunta_train <- conjunta_train %>%  select(-TCIA_ID, -OS)
 conjunta_test <- conjunt_test %>%  select(-TCIA_ID, -OS)
+```
+
+```{r}
+conjunta$Recist <- factor(conjunta$Recist)
+conjunta_train$Recist <- factor(conjunta_train$Recist)
+conjunta_test$Recist <- factor(conjunta_test$Recist)
 ```
 
 ## Funcions útils
@@ -133,7 +145,7 @@ print(confusion_matrix)
 ```
 
 ```{r}
-roc_curve <- roc(conjunta_test$Recist, predicted_labels)
+roc_curve <- roc(conjunta_test$Recist, predictions)
 auc_value <- auc(roc_curve)
 print(paste("AUC:", auc_value))
 plot(roc_curve, main = "Corba ROC", col = colorTFG)
@@ -144,14 +156,14 @@ plot(roc_curve, main = "Corba ROC", col = colorTFG)
 En aquest apartat, entrenarem el model de Random Forest a les nostres dades clíniques.
 
 ```{r}
-rf_model <- randomForest(Recist ~ ., data = conjunta_train, ntree = 500, mtry = 6, importance = TRUE)
+rf_model <- randomForest(Recist ~ ., data = conjunta_train, ntree = 500, mtry = 3, importance = TRUE)
 ```
 
 ```{r}
-rf_predictions <- predict(rf_model, newdata = clinical_test, type = "prob")[, 2]
+rf_predictions <- predict(rf_model, newdata = conjunta_test, type = "prob")[, 2]
 
 # Evaluar el modelo con la métrica AUC
-roc_curve <- roc(clinical_test$Recist, rf_predictions)
+roc_curve <- roc(conjunta_test$Recist, rf_predictions)
 auc_value <- auc(roc_curve)
 
 # Imprimir el valor de AUC

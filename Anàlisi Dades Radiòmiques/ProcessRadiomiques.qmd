@@ -21,7 +21,7 @@ colorTFG <- rgb(91, 200, 145, maxColorValue = 250)
 Primer de tot, llegim el csv amb les caractrístiques radiòmiques:
 
 ```{r}
-radiomica_data <- read_csv("Radiomica Data csv/radiomica_data.csv", show_col_types = FALSE)
+radiomica_data <- read_csv("Anàlisi Dades Radiòmiques/Radiomica Data csv/radiomica_data.csv", show_col_types = FALSE)
 #str(radiomica_data)
 ```
 
@@ -54,7 +54,7 @@ radiomica_data_quant <- as.data.frame(scale(radiomica_data_quant))
 Adjuntam la variable $OS$ al dataframe de radiòmiques
 
 ```{r}
-clinical <- read.csv("Clinical Data csv/clinical_data_processed.csv")
+clinical <- read.csv("Anàlisi Dades Clíniques/Clinical Data csv/clinical_data_processed.csv")
 
 radiomica_data <- cbind(Patient, radiomica_data_quant)
 OS = clinical$OS
@@ -73,19 +73,20 @@ write.csv(radiomica_data, file = nombre_archivo, row.names = FALSE)
 Cream el conjunt de dades d'entrenament i el conjunt de dades test
 
 ```{r}
-set.seed(2024)
-train <- sample(1:nrow(radiomica_data), 70)
-test <- (-train)
-radiomica_data_train <- radiomica_data[train,]
+
+sample(29)
+test <- c(2,8,10,12,18,21,22,23,24,27,31,36,38,39,40,41,42,47,51,53,56,64,72,73,74,76,80,82,83,84,87,92,100,103)
+test
+radiomica_data_train <- radiomica_data[-test,]
 radiomica_data_test <- radiomica_data[test,]
 ```
 
 ```{r}
-nombre_archivo <- "radiomica_data_processed_test.csv"
+nombre_archivo <- "Anàlisi Dades Radiòmiques/Radiomica Data csv/radiomica_data_processed_test.csv"
 
 write.csv(radiomica_data_test, file = nombre_archivo, row.names = FALSE)
 
-nombre_archivo <- "radiomica_data_processed_train.csv"
+nombre_archivo <- "Anàlisi Dades Radiòmiques/Radiomica Data csv/radiomica_data_processed_train.csv"
 
 write.csv(radiomica_data_train, file = nombre_archivo, row.names = FALSE)
 ```

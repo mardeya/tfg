@@ -4,7 +4,6 @@ format: html
 editor: visual
 ---
 
-
 ```{r}
 colorTFG <- rgb(91, 200, 145, maxColorValue = 250)
 ```
@@ -30,13 +29,13 @@ library(e1071)
 Primer de tot llegim els csv generats durant el processament de les dades clíniques.
 
 ```{r}
-clinical <- read.csv("Clinical Resist csv/clinical_data_processed.csv")
+clinical <- read.csv("Recist Data csv/clinical_data_processed.csv")
 #str(clinical)
 
-clinical_train <- read.csv("Clinical Resist csv/clinical_data_processed_train.csv")
+clinical_train <- read.csv("Recist Data csv/clinical_data_processed_train.csv")
 #str(clinical_train)
 
-clinical_test <- read.csv("Clinical Resist csv/clinical_data_processed_test.csv")
+clinical_test <- read.csv("Recist Data csv/clinical_data_processed_test.csv")
 #str(clinical_test)
 
 
@@ -45,6 +44,11 @@ clinical_train <- clinical_train %>%  select(-TCIA_ID)
 clinical_test <- clinical_test %>%  select(-TCIA_ID)
 ```
 
+```{r}
+clinical$Recist <- factor(clinical$Recist)
+clinical_train$Recist <- factor(clinical_train$Recist) 
+clinical_test$Recist <- factor(clinical_test$Recist) 
+```
 
 ## Funcions útils
 
@@ -86,7 +90,12 @@ train_control <- trainControl(method = "cv", number = 5)
 
 ## Regressió logística
 
-Entrenarem la regressió logística
+```{r}
+clinical_train$Recist <- as.factor(clinical_train$Recist)
+clinical_test$Recist <- as.factor(clinical_test$Recist)
+```
+
+Entrenarem la regressió logística per a la calssificació usant dades clíniques
 
 ```{r}
 model <- glm(Recist ~ ., data = clinical_train, family = binomial)
@@ -95,16 +104,16 @@ summary(model)
 
 ```{r}
 predictions <- predict(model, newdata = clinical_test, type = "response")
-predicted_labels <- ifelse(predictions > 0.5, 1, 0) %>%  as.vector()
+#predicted_labels <- ifelse(predictions > 0.5, 1, 0) %>%  as.vector()
 
 
-confusion_matrix <- table(clinical_test$Recist, predicted_labels)
+#confusion_matrix <- table(clinical_test$Recist, predicted_labels)
 
-print(confusion_matrix)
+#print(confusion_matrix)
 ```
 
 ```{r}
-roc_curve <- roc(clinical_test$Recist, predicted_labels)
+roc_curve <- roc(clinical_test$Recist, predictions)
 auc_value <- auc(roc_curve)
 print(paste("AUC:", auc_value))
 plot(roc_curve, main = "Corba ROC", col = colorTFG)
@@ -115,14 +124,7 @@ plot(roc_curve, main = "Corba ROC", col = colorTFG)
 En aquest apartat, entrenarem el model de Random Forest a les nostres dades clíniques.
 
 ```{r}
-clinical_train$Recist <- as.factor(clinical_train$Recist)
-clinical_test$Recist <- as.factor(clinical_test$Recist)
-```
-
-
-
-```{r}
-rf_model <- randomForest(Recist ~ ., data = clinical_train, ntree = 500, mtry = 6, importance = TRUE)
+rf_model <- randomForest(Recist ~ ., data = clinical_train, ntree = 500, mtry = 3, importance = TRUE)
 ```
 
 ```{r}
@@ -140,7 +142,6 @@ plot(roc_curve, main = "Corba ROC", col = colorTFG)
 ```
 
 ## Naive Bayes
-
 
 ```{r}
 nb_model <- naiveBayes(Recist ~ ., data = clinical_train)
@@ -172,4 +173,3 @@ print(paste("AUC: ", auc_value))
 # Plot de la corba ROC
 plot(roc_curve, main = " Corba ROC", col= colorTFG)
 ```
-

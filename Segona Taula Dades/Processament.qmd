@@ -1,0 +1,180 @@
+---
+title: "segona taula de dades"
+format: html
+editor: visual
+---
+
+## Paquets necessaris
+
+Primer de tot carregam tots el paquets necessaris i carregam el color propi de la memòria del TFG.
+
+```{r}
+library(glmnet)
+library(dplyr)
+library(readxl)
+library(ggplot2)
+library(factoextra)
+library(pls)
+library(randomForest)
+library(caret)
+
+colorTFG <- rgb(91, 200, 145, maxColorValue = 250)
+```
+
+A continuació, llegim els csv necesaris:
+
+```{r}
+data <- read.csv("Data csv/features.csv")
+objectiu <- read.csv("Data csv/objective.csv")
+```
+
+```{r}
+data_union <- right_join(data, objectiu, by = "X")
+```
+
+```{r}
+data <- data_union %>%  select(-X)
+```
+
+```{r}
+radiomica_data_quant <- data %>%  select(-Recist)
+```
+
+## Anàlisi de col·linealitat
+
+```{r}
+corr_matrix <- cor(radiomica_data_quant)
+
+high_corr <- which(abs(corr_matrix) > 0.65 & upper.tri(corr_matrix), arr.ind = TRUE)
+
+var_counts <- table(c(rownames(corr_matrix)[high_corr[,1]], colnames(corr_matrix)[high_corr[,2]]))
+
+for (i in 1:nrow(high_corr)) {
+  var1 <- rownames(corr_matrix)[high_corr[i, 1]]
+  var2 <- colnames(corr_matrix)[high_corr[i, 2]]
+  if (var1 %in% colnames(radiomica_data_quant) && var2 %in% colnames(radiomica_data_quant)) {
+    if (var_counts[var1] <= var_counts[var2]) {
+      radiomica_data_quant <- radiomica_data_quant[, !colnames(radiomica_data_quant) %in% var1]
+    } else {
+      radiomica_data_quant <- radiomica_data_quant[, !colnames(radiomica_data_quant) %in% var2]
+    }
+  }
+}
+```
+
+```{r}
+data <- cbind(radiomica_data_quant, data$Recist)
+```
+
+```{r}
+
+data$`data$Recist`
+data <- subset(data, data$`data$Recist` != "")
+data <- data %>%
+  rename(Recist = `data$Recist`)
+data$Recist
+```
+
+
+## Recist 
+
+```{r}
+data$Recist <- factor(data$Recist)
+data$Recist <- recode(data$Recist, "RP" = 0, "RC" = 0, "EE" = 1, "PD"= 1)
+table(data$Recist)
+```
+## Dades test i dades train
+
+```{r}
+set.seed(2024)
+train <- sample(1:nrow(data), 80)
+test <- (-train)
+data_train <- data[train,]
+data_test <- data[test,]
+```
+
+## Regressió logística
+
+```{r}
+data_train$Recist <- as.factor(data_train$Recist)
+data_test$Recist <- as.factor(data_test$Recist)
+```
+
+Entrenarem la regressió logística per a la calssificació usant dades clíniques
+
+```{r}
+model <- glm(Recist ~ ., data = data_train, family = binomial)
+summary(model)
+```
+
+```{r}
+predictions <- predict(model, newdata = data_test, type = "response")
+#predicted_labels <- ifelse(predictions > 0.5, 1, 0) %>%  as.vector()
+
+
+#confusion_matrix <- table(data_test$Recist, predicted_labels)
+
+#print(confusion_matrix)
+```
+
+```{r}
+roc_curve <- roc(data_test$Recist, predictions)
+auc_value <- auc(roc_curve)
+print(paste("AUC:", auc_value))
+plot(roc_curve, main = "Corba ROC", col = colorTFG)
+```
+
+## Random Forest
+
+En aquest apartat, entrenarem el model de Random Forest a les nostres dades clíniques.
+
+```{r}
+rf_model <- randomForest(Recist ~ ., data = data_train, ntree = 500, mtry = 3, importance = TRUE)
+```
+
+```{r}
+rf_predictions <- predict(rf_model, newdata = data_test, type = "prob")[, 2]
+
+# Evaluar el modelo con la métrica AUC
+roc_curve <- roc(data_test$Recist, rf_predictions)
+auc_value <- auc(roc_curve)
+
+# Imprimir el valor de AUC
+print(paste("AUC:", auc_value))
+
+# Graficar la curva ROC
+plot(roc_curve, main = "Corba ROC", col = colorTFG)
+```
+
+## Naive Bayes
+
+```{r}
+nb_model <- naiveBayes(Recist ~ ., data = data_train)
+
+# Realitzar prediccions sobre el conjunt de test
+nb_predictions_prob <- predict(nb_model, data_test, type = "raw")
+
+# Suposant que la variable objectiu 'Recist' és binària i que la primera columna de nb_predictions_prob
+# conté les probabilitats per a la classe positiva (p.ex., "1")
+nb_predictions <- ifelse(nb_predictions_prob[, 2] > 0.5, "1", "0")
+
+# Crear una taula de confusió
+conf_matrix <- table(Predicted = nb_predictions, Actual = data_test$Recist)
+
+# Mostrar la taula de confusió
+print(conf_matrix)
+
+# Calcular l'accuràcia del model
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+print(paste("Accuracy: ", accuracy))
+
+# Calcular la corba ROC i l'AUC
+roc_curve <- roc(data_test$Recist, as.numeric(nb_predictions_prob[, 2]))
+auc_value <- auc(roc_curve)
+
+# Mostrar l'AUC
+print(paste("AUC: ", auc_value))
+
+# Plot de la corba ROC
+plot(roc_curve, main = " Corba ROC", col= colorTFG)
+```
